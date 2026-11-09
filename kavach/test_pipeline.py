@@ -4,7 +4,7 @@ import json, re, sys, tempfile
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
-from kavach import evon as E, notary as N, pipeline as P, transcript as T
+from kavach import evon as E, guardian as G, notary as N, pipeline as P, transcript as T
 from kavach.rules import TACTICS
 
 HERE = Path(__file__).parent
@@ -86,6 +86,12 @@ check("pipeline: agents run in the fixed order", ev.calls == ["punctuate", "pros
 check("pipeline: Evon's clean Telugu warning is used", r["warning"]["source"] == "evon")
 check("pipeline: complaint drafted for SCAM", "OTP" in r["report"])
 check("pipeline: flagged call is sealed and verifies", r["seal"] and led.verify("kyc")["packet_matches_seal"])
+fa = r["family_alert"]
+check("family alert: SCAM alerts the family in Telugu, urgent, linked to the seal, without the caller's words",
+      fa["send"] and fa["level"] == "urgent" and fa["lang"] == "te" and G.telugu_ratio(fa["text"]) > 0.6
+      and fa["seal_index"] == r["seal"]["index"] and not G.echoes(fa["text"], T.rules_text(kyc)) and "OTP" in fa["english"])
+check("family alert: a Hindi listener's family is alerted in Hindi",
+      P.analyse(kyc, ev, ledger=ledger(), speak=False, warn_lang="hi")[0]["family_alert"]["text"].startswith("ज़रूरी"))
 sealed = json.loads((led.root / "packets" / "kyc.json").read_bytes())
 check("pipeline: the sealed packet holds transcript, evidence, verdict, warning and report",
       sealed["verdict"] == "SCAM" and sealed["evidence"] == r["evidence"] and sealed["report"] and sealed["warning"]["source"] == "evon")
@@ -105,8 +111,14 @@ check("judge: a listener line is never caller evidence", P.analyse(kyc, listener
 
 # 4. SAFE calls: silent, nothing sealed
 r, audio = P.analyse(genuine, FakeEvon(), ledger=ledger(), speak=True)
-check("SAFE: no warning, no audio, no seal, no complaint", r["verdict"] == "SAFE" and r["warning"]["source"] == "silent" and audio is None
-      and r["seal"] is None and r["report"] == "")
+check("SAFE: no warning, no audio, no seal, no complaint, no family alert", r["verdict"] == "SAFE" and r["warning"]["source"] == "silent"
+      and audio is None and r["seal"] is None and r["report"] == "" and r["family_alert"] == {"send": False})
+import tempfile as _t
+box = Path(_t.mkdtemp()) / "outbox.jsonl"
+from kavach import family_alert as F
+F.queue(r["family_alert"], "pension", box)
+F.queue(F.build("SCAM", ["otp_pin_password_request"]), "kyc", box)
+check("family alert: only flagged calls reach the outbox", [json.loads(l)["call_id"] for l in box.read_text(encoding="utf-8").splitlines()] == ["kyc"])
 
 # 5. red lines catch what Evon misses
 calls = {x["id"]: x for x in map(json.loads, open(HERE.parent / "data" / "kavach_calls_44.jsonl", encoding="utf-8"))}

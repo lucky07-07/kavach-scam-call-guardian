@@ -4,13 +4,14 @@
 #   4 Judge (kavach.rules): only claims whose quote is the caller's own words, with a cue and not negated; red lines in
 #     code; the verdict is a fixed rule over verified evidence and is never Evon's
 #   explainer (Evon): one sentence for the family
-#   5 Guardian (Evon text, checked; else approved Telugu warning; Timbre voice)
+#   5 Guardian (Evon text, checked; else approved Telugu warning; Timbre voice), and the family alert (code-built, SCAM
+#     or SUSPICIOUS only) so someone can call the listener back
 #   6 Reporter (Evon): complaint draft, SCAM only
 #   7 Notary: flagged calls are sealed (hash chain + OpenTimestamps)
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from kavach import evon as E, guardian as G, listener as L, notary as N, transcript as T
+from kavach import evon as E, family_alert as F, guardian as G, listener as L, notary as N, transcript as T
 from kavach.rules import TACTICS, decide, in_caller_lines, red_lines, verify
 
 
@@ -58,6 +59,7 @@ def analyse(transcript, evon, tts=None, ledger=None, speak=True, seal=True, mode
         packet = N.make_packet(t, verdict, tactics, evidence, warning, benign, models)
         packet["reason"], packet["report"] = reason, report
         result["seal"] = (ledger or N.Ledger()).seal(packet)
+    result["family_alert"] = F.build(verdict, tactics, evidence, warn_lang, (result["seal"] or {}).get("index"))
     timings["total_s"] = round(time.time() - t0, 1)
     return result, audio
 
