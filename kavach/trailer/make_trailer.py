@@ -1,8 +1,9 @@
-# Launch-style trailer for Kavach (60 s, for the "Demo Day Drop" award). Story: the phone rings, the scam call itself
-# (real audio, typed on screen), cut dead on the OTP request -> what it costs (official loss figure) -> Kavach -> how it
+# Launch-style trailer for Kavach (60 s, for the "Demo Day Drop" award). Story: cold open on the scam call itself (real
+# Telugu audio, big English subtitles), the OTP lands on her phone, she starts reading it out, cut to silence -> what it
+# costs (official loss figure, and per day) -> "what if someone else was on the call?" -> Kavach -> how it
 # works (eight agents, dissolving into the app's own step strip) -> the real app in motion, one continuous take per scene
 # (recorded by record_walkthrough: Analyse and the Judge; the Telugu warning) -> the family alert as it reaches a phone
-# (its real text and Timbre voice note) -> the family asks Kavach (Ask tab) -> Hindi -> a genuine call left alone -> the
+# (its real text and Timbre voice note) -> the family asks Kavach (Ask tab) -> many languages (the Hindi warning) -> a genuine call left alone -> the
 # seal verified and an edited copy rejected -> 100% Gnani. Timbre narration, whole sentences of the real warnings
 # (cut at their pauses), synthesised SFX and a 100 BPM bed; every scene starts on the beat.
 #   data/demo/trailer/kavach_trailer.mp4  (1920x1080)
@@ -26,7 +27,12 @@ HI_WARN = DEMO / "warning_hi_template.wav"
 WALK = DEMO / "walkthrough.mp4"      # from kavach.trailer.record_walkthrough: real clicks on the running screen
 CALL_FROM = 12.70                    # the caller's OTP request in the scam call (its turn starts at 12.79 s)
 LOSS = "22,845"                      # ₹ crore lost to cyber fraud in India in 2024: MHA reply in the Lok Sabha, July 2025
-ANSWER = 1.5                         # the phone rings this long before the call is picked up
+VOICE_AT = 0.3                       # the caller is already talking when the trailer opens
+DIGITS = [0.0, 0.6, 1.05]            # she starts reading the OTP out, faster each digit; then the cut
+STAKES_DAY = 2.4                     # into the stakes scene: the yearly figure gives way to the daily one
+SUBTITLE = "You'll get an OTP on your phone now. Tell it to me."
+SMS_AT = 1.5                         # into the caller's line: the OTP lands as he says "OTP"
+PER_DAY = 62                         # ₹ crore a day: 22,845 / 366 days of 2024
 
 
 # ---------------------------------------------------------------- timeline: every scene starts on the beat
@@ -53,20 +59,21 @@ def timeline():
     warn_take = m["warn_click"] - 0.5                     # the warn scene starts half a second before the play click
     te_end, fam_end, hi_end = pause_before(TE_WARN, 3.0), pause_before(FAMILY, 3.6), pause_before(HI_WARN, 3.2)
     call_end = pause_before(CALL, CALL_FROM + 3.8, CALL_FROM)
-    fam_at = 0.25 + vo["family"] + 0.15                   # the voice note plays right after the narration line
+    reply = VOICE_AT + (call_end - CALL_FROM) + 0.3        # when she starts reading the OTP out
+    fam_at = 0.25 + vo["family"] + 0.05                   # the voice note plays right after the narration line
     scenes = [  # (id, at least seconds, narration, extra audio [(file, at, from, to)], flash on the cut, walkthrough take start)
-        ("call", ANSWER + (call_end - CALL_FROM) + 2.3, None, [(CALL, ANSWER, CALL_FROM, call_end)], False, None),
-        ("stakes", 4.2, "stakes", [], True, None),
+        ("call", reply + 2.95, None, [(CALL, VOICE_AT, CALL_FROM, call_end)], False, None),
+        ("stakes", vo["stakes"] + 1.7, "stakes", [], True, None),
         ("reveal", 0, "reveal", [], True, None),
         ("pipeline", 5.4, "agents", [], False, m["take_listen"]),
         ("listen", 4.8, "listen", [], False, m["take_listen"]),
         ("warn", 0, None, [(TE_WARN, 0.5, 0, te_end)], True, warn_take),
         ("family", 0, "family", [(FAMILY, fam_at, 0, fam_end)], False, None),
         ("ask", 3.6, "ask", [], False, m["take_ask"]),
-        ("hindi", 0, "hindi", [(HI_WARN, 1.12, 0, hi_end)], False, None),
+        ("langs", 0, None, [(HI_WARN, 0.6, 0, hi_end)], False, None),
         ("genuine", 3.6, "genuine", [], False, m["take_genuine"]),
         ("seal", 3.6, "seal", [], False, m["take_seal"]),
-        ("sovereign", 4.8, "sovereign", [], True, None),
+        ("sovereign", 4.2, "sovereign", [], True, None),
         ("end", 0, "end", [], True, None)]
     t, out = 0.0, []
     for sid, least, key, extras, flash, take in scenes:
@@ -76,7 +83,8 @@ def timeline():
         out.append({"id": sid, "start": round(t, 3), "dur": round(dur, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
                     "take": take, "extras": [{"file": str(f), "at": round(t + at, 3), "from": a, "to": b} for f, at, a, b in extras]})
         t += dur
-    out[0]["punch"] = round(ANSWER + (call_end - CALL_FROM) + 0.15, 3)     # the call is cut dead on the OTP request
+    out[0].update(sms=SMS_AT, voice=round(call_end - CALL_FROM, 3), reply=round(reply, 3),
+                  cut=round(reply + DIGITS[-1] + 0.4, 3), punch=round(reply + DIGITS[-1] + 1.0, 3))   # silence, then the punch
     out[next(i for i, s in enumerate(out) if s["id"] == "family")]["note_at"] = fam_at
     return out, round(t + 0.3, 2)
 
@@ -206,7 +214,7 @@ def build_audio(scenes, total):
     m = marks()
     punch = scenes[0]["punch"]
     bed = music(total, at["reveal"], at["reveal"] - 0.45, at["end"])
-    bed *= np.minimum(1, np.maximum(0, np.arange(len(bed)) / SR - punch) / 0.4)   # no music under the call: ring, voice, heartbeat
+    bed *= np.minimum(1, np.maximum(0, np.arange(len(bed)) / SR - punch) / 0.4)   # no music under the call: voice, heartbeat, ticks
     voice, fx = np.zeros_like(bed), np.zeros_like(bed)
     for s in scenes:
         if s["vo"]:
@@ -219,15 +227,20 @@ def build_audio(scenes, total):
             place(fx, impact(1.2), s["start"], 0.75)
         elif s["id"] != "call":
             place(fx, whoosh(0.4), max(0, s["start"] - 0.2), 0.45)
-    for k in range(2):                                                 # the phone rings twice, then is answered
-        place(fx, ring(), 0.05 + k * 0.7, 0.55)
-    for k in range(int((punch - ANSWER) / 0.85)):                      # a heartbeat under the caller
-        place(fx, impact(0.22), ANSWER + 0.2 + k * 0.85, 0.35)
-        place(fx, impact(0.18), ANSWER + 0.42 + k * 0.85, 0.22)
-    place(fx, impact(1.4), punch, 0.9)                                 # cut dead on the OTP request
+    c = scenes[0]
+    for k in range(int(c["reply"] / 0.85)):                            # a heartbeat under the caller
+        place(fx, impact(0.22), 0.1 + k * 0.85, 0.35)
+        place(fx, impact(0.18), 0.32 + k * 0.85, 0.22)
+    place(fx, ring(0.3), VOICE_AT + c["sms"], 0.4)                     # the OTP lands on her phone
+    for k, d in enumerate(DIGITS):                                     # each digit she reads out, louder
+        place(fx, tick(0.09, 1800 + 200 * k), c["reply"] + d, 0.6 + 0.2 * k)
+    fx[int(c["cut"] * SR):int(punch * SR)] = 0                        # dead silence
+    voice[int(c["cut"] * SR):int(punch * SR)] = 0
+    place(fx, impact(1.4), punch, 0.95)                                # then the punch
     place(fx, riser(2.0), at["reveal"] - 2.45, 0.6)                    # riser, then silence, then the drop
     place(fx, impact(), at["reveal"], 0.6)
     place(fx, impact(0.8), at["stakes"] + 0.3, 0.35)                   # the figure lands
+    place(fx, impact(0.8), at["stakes"] + STAKES_DAY, 0.5)            # and again, per day
     place(fx, riser(1.4), at["sovereign"] - 1.4, 0.5)
     for i in range(8):                                                 # the pipeline lights up, agent by agent
         place(fx, tick(0.05, 1400 + 90 * i), at["pipeline"] + 0.3 + i * 0.42, 0.45)
@@ -285,24 +298,30 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .en{font-size:34px;color:#9aa1ad;margin-top:16px}
 .three{display:flex;gap:28px;justify-content:center;margin-top:60px}
 .three span{font-size:40px;font-weight:700;padding:14px 30px;border-radius:16px;background:#14171d;border:1px solid #262b36}
-.ringer{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .2s}
-.ringer .ph{position:relative;display:grid;place-items:center;text-align:center}
-.on .ringer .ph{animation:buzz .09s linear infinite}
-.answered .ringer .ph{animation:none}
-@keyframes buzz{25%{transform:translate(-5px,2px) rotate(-1deg)}75%{transform:translate(5px,-2px) rotate(1deg)}}
-.ring{position:absolute;top:0;left:50%;margin-left:-110px;width:220px;height:220px;border-radius:50%;border:3px solid #4fd08f;opacity:0;box-sizing:border-box}
-.on .ring{animation:ring 1s ease-out infinite;animation-delay:var(--r)}
-@keyframes ring{from{transform:scale(.8);opacity:.9}to{transform:scale(2.4);opacity:0}}
-.cicon{width:220px;height:220px;border-radius:50%;background:#4fd08f;display:grid;place-items:center;font-size:110px;color:#07080b;font-weight:800}
-.cin{font-size:30px;letter-spacing:5px;text-transform:uppercase;color:#8a909c;margin-top:70px;font-weight:700}
-.cname{font-size:92px;font-weight:800;letter-spacing:-2px;margin-top:10px}
-.callbox{width:1500px;text-align:center;opacity:0}.answered .callbox{opacity:1}.answered .ringer{opacity:0}
-.cut .callbox{opacity:0}
+.callwrap{display:flex;align-items:center;gap:100px}
+.callwrap .phone{height:760px}
+.oncall{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:20px;background:#12351f;color:#7ee2a8;font-size:21px;font-weight:700}
+.oncall i{width:10px;height:10px;border-radius:50%;background:#4fd08f;animation:blink 1s infinite}
+.oncall span{margin-left:auto;font-weight:500;color:#9fd8b6}
+.sms{margin-top:22px;background:#1a1e26;border-radius:22px;padding:18px 20px;opacity:0;transform:translateY(-24px) scale(.95)}
+.got .sms{animation:wordin .35s cubic-bezier(.2,.8,.2,1) forwards}
+.sms small{display:block;font-size:17px;color:#8a909c;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.sms p{margin:8px 0 0;font-size:24px;line-height:1.45}
+.sms b{font-size:34px;letter-spacing:4px;color:#f3b13f}
+.subs{width:1000px}
+.subs .live{margin-bottom:6px}
+.subs .bars{justify-content:flex-start;margin:26px 0 18px}
+.say1{font-size:74px;font-weight:800;letter-spacing:-2px;line-height:1.12;min-height:170px}
+.subs .tel{font-size:30px;color:#8a909c;font-weight:500;min-height:0;margin-top:22px}
+.amma{font-size:96px;font-weight:800;color:#f3b13f;letter-spacing:-2px;margin-top:10px;opacity:0}
+.reading .say1{opacity:.25}.reading .amma{opacity:1}.reading .bars b{background:#f3b13f}
+.amma small{display:block;font-size:26px;letter-spacing:3px;text-transform:uppercase;color:#8a909c;font-weight:700;margin-bottom:6px}
+.cut .callwrap{opacity:0}
 .punch{position:absolute;inset:0;display:grid;place-items:center;text-align:center;opacity:0;background:#07080b}
-.cut .punch{opacity:1;animation:shake .4s linear}
+.punch.go{opacity:1;animation:shake .4s linear}
 @keyframes shake{20%{transform:translate(-14px,6px)}40%{transform:translate(12px,-8px)}60%{transform:translate(-8px,4px)}80%{transform:translate(5px,-2px)}}
 .punch b{display:block;font-size:150px;font-weight:800;letter-spacing:-5px;line-height:1.1}
-.punch b+b{color:#ff5a4e;opacity:0}.cut .punch b+b{animation:fadein .3s .55s forwards}
+.punch b+b{color:#ff5a4e;opacity:0}.punch.go b+b{animation:fadein .3s .55s forwards}
 .otp{color:#ff5a4e;font-weight:800}
 /* the family alert, as it reaches a phone */
 .famwrap{display:flex;align-items:center;gap:110px}
@@ -335,6 +354,15 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .stat .n small{font-size:90px;letter-spacing:-2px;color:#f2f3f6;margin-left:24px;text-shadow:none}
 .stat .t{font-size:46px;color:#c6cbd4;text-align:center;margin-top:18px}
 .stat .src{font-size:24px;color:#6f7684;text-align:center;margin-top:36px}
+.stat,.perday,.whatif{transition:opacity .25s}
+.perday,.whatif{position:absolute;inset:0;display:grid;place-items:center;text-align:center;opacity:0}
+.day .stat{visibility:hidden}.day .perday{opacity:1}.day .perday>div{animation:slam .5s cubic-bezier(.2,.9,.3,1.2) both}
+.perday .n{font-size:260px;font-weight:800;letter-spacing:-9px;line-height:1;color:#ff5a4e;text-shadow:0 0 90px rgba(255,90,78,.4)}
+.perday .n small{font-size:100px;color:#f2f3f6;letter-spacing:-2px;margin-left:24px;text-shadow:none}
+.perday .t{font-size:64px;font-weight:800;margin-top:8px}
+.perday .src{font-size:24px;color:#6f7684;margin-top:30px}
+.ask2 .perday{visibility:hidden}.ask2 .whatif{opacity:1}
+.whatif div{font-size:84px;font-weight:800;letter-spacing:-2px;line-height:1.15}
 /* the reveal */
 .logo{display:flex;align-items:center;gap:36px;opacity:0;transform:scale(1.3);filter:blur(20px)}
 .on .logo{animation:logo .9s cubic-bezier(.16,.9,.2,1) forwards}
@@ -377,6 +405,10 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 /* hindi, sovereign, end */
 .warncard{max-width:1500px;text-align:center}
 .tag{font-size:34px;color:#8a909c}
+.lrow{display:flex;gap:16px;justify-content:center;align-items:center;margin-top:30px}
+.lrow em{font-style:normal;width:120px;text-align:right;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:#8a909c;font-weight:700;margin-right:10px}
+.lrow span{font-size:36px;font-weight:700;padding:10px 26px;border-radius:999px;background:#14171d;border:1px solid #2c313c}
+.lrow span.now{border-color:#f3b13f;color:#f3b13f;box-shadow:0 0 30px rgba(243,177,63,.3)}
 .say{font-size:66px;font-weight:700;line-height:1.5;margin-top:20px}
 .gloss{font-size:34px;color:#9aa1ad;margin-top:24px}
 .big{font-size:96px;font-weight:800;letter-spacing:-3px;line-height:1.05;text-align:center}
@@ -391,19 +423,23 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .flash.go{animation:flash .32s ease-out}
 @keyframes flash{from{opacity:.85}to{opacity:0}}
 </style></head><body>
-<div class="scene" id="call">
- <div class="ringer"><div class="ph"><i class="ring" style="--r:0s"></i><i class="ring" style="--r:.5s"></i><div class="cicon">✆</div>
-  <div class="cin">Incoming call · Amma's phone</div><div class="cname">"SBI Head Office"</div></div></div>
- <div class="callbox">
- <div class="live"><i></i>Amma, alone on the line · in Telugu</div>
- <div class="bars" id="bars">BARS</div>
- <div class="tel te" id="tel"></div>
- <div class="en">“You'll get an <span class="otp">OTP</span> on your phone now. Tell it to me.”</div></div>
- <div class="punch"><div><b>One OTP.</b><b>Her savings, gone.</b></div></div></div>
+<div class="scene" id="call"><div class="callwrap">
+ <div class="phone"><div class="notch"></div><div class="pbar">Amma's phone</div>
+  <div class="oncall"><i></i>On call · "SBI Head Office"<span>02:41</span></div>
+  <div class="sms"><small>Bank SMS · now</small><p><b>482917</b> is your OTP. Do not share it with anyone.</p></div></div>
+ <div class="subs"><div class="live"><i></i>Real scam call · Telugu, subtitled</div>
+  <div class="bars" id="bars">BARS</div>
+  <div class="say1" id="say1"></div>
+  <div class="tel te" id="tel"></div>
+  <div class="amma"><small>Amma, reading it out</small>“Four… eight… two…”</div></div></div>
+ <div class="punch" id="punch"><div><b>One OTP.</b><b>Her savings, gone.</b></div></div></div>
 <div class="scene" id="stakes"><div class="stat">
  <div class="n"><span id="crore">₹0</span><small>crore</small></div>
  <div class="t in" style="--d:.6s">lost to cyber fraud in India in 2024</div>
- <div class="src in" style="--d:1.2s">Ministry of Home Affairs, reply in the Lok Sabha, July 2025 (NCRP / CFCFRMS data)</div></div></div>
+ <div class="src in" style="--d:1.2s">Ministry of Home Affairs, reply in the Lok Sabha, July 2025 (NCRP / CFCFRMS data)</div></div>
+ <div class="perday"><div><div class="n">₹PER_DAY<small>crore</small></div><div class="t">every single day.</div>
+  <div class="src">₹22,845 crore ÷ 366 days of 2024</div></div></div>
+ <div class="whatif"><div>What if someone else<br>was on the call?</div></div></div>
 <div class="scene" id="reveal"><div class="glow"></div><div><div class="logo"><div class="mark">K</div><div class="name">Kavach</div></div>
  <div class="sub">A second listener on the call · built on Gnani AI</div></div></div>
 <div class="scene" id="pipeline"><div class="pwrap"><div class="kick">How Kavach works · eight agents, one call</div>
@@ -422,10 +458,13 @@ LIVE_warn
   <div class="note in" style="--d:1.4s">Text and Timbre voice note built from the Judge's verified tactics, never the caller's words.
    Shown as it would arrive: the SMS / WhatsApp gateway is not connected yet.</div></div></div></div>
 LIVE_ask
-<div class="scene" id="hindi"><div class="warncard">
- <div class="tag in">The same warning, in Hindi · Timbre</div>
- <div class="say hi in" style="--d:1.2s">सावधान! यह धोखाधड़ी वाली कॉल है।</div>
- <div class="gloss in" style="--d:1.8s">“Careful! This is a fraud call.”</div></div></div>
+<div class="scene" id="langs"><div class="warncard">
+ <div class="kick">Multilingual · Prisma hears · Timbre warns</div>
+ <div class="big in" style="margin-top:14px">One Kavach. <span class="amber">Many languages.</span></div>
+ <div class="lrow in" style="--d:.3s"><em>Hears</em><span class="te">తెలుగు</span><span class="hi">हिन्दी</span><span>English</span><span>Code-mixed</span></div>
+ <div class="lrow in" style="--d:.5s"><em>Warns</em><span class="te">తెలుగు</span><span class="hi now">हिन्दी</span></div>
+ <div class="say hi in" style="--d:.6s;font-size:56px;margin-top:34px">सावधान! यह धोखाधड़ी वाली कॉल है।</div>
+ <div class="gloss in" style="--d:.9s">“Careful! This is a fraud call.” · the warning, in Hindi</div></div></div>
 LIVE_genuine
 LIVE_seal
 <div class="scene" id="sovereign"><div>
@@ -439,7 +478,7 @@ LIVE_seal
  <div class="sub" style="font-size:52px;color:#f2f3f6">Keep the listener safe.</div>
  <div class="hash-tags in" style="--d:1.2s">#GnaniAI · #GreatIndianAIInternshipChallenge</div></div></div>
 <script>
-const TL = TIMELINE, TEL = TELTEXT;
+const TL = TIMELINE, TEL = TELTEXT, SUB = SUBTEXT, DIGITS = DIGITLIST, VOICE_AT = VOICEAT, STAKES_DAY = DAYAT;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 window.prep = async () => {
   // seek every take before the clock starts, so no cut shows a stale or loading frame
@@ -459,18 +498,27 @@ window.run = async () => {
     const el = document.getElementById(s.id); el.classList.add("on");
     if (s.flash) { const f = document.getElementById("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
     if (s.id !== "pipeline" && s.take !== null) document.getElementById("v_" + s.id).play();
-    if (s.id === "call") {   // rings, is answered, the caller's words type out with the audio, then the cut on the OTP request
-      const tel = document.getElementById("tel"), ans = ANSWER * 1000, t1 = performance.now() + ans + 100, len = TEL.length;
-      setTimeout(() => el.classList.add("answered"), ans);
-      (function f() { const p = Math.max(0, Math.min(1, (performance.now() - t1) / ((s.punch - ANSWER - 0.4) * 1000)));
-        tel.textContent = TEL.slice(0, Math.round(p * len)); if (p < 1) requestAnimationFrame(f); })();
-      setTimeout(() => el.classList.add("cut"), s.punch * 1000);
+    if (s.id === "call") {   // the caller talks (English subtitles keep pace), the OTP lands, she reads it out, silence, punch
+      const tel = document.getElementById("tel"), say = document.getElementById("say1"), words = SUB.split(" ");
+      const t1 = performance.now() + VOICE_AT * 1000, span = s.voice * 1000;
+      (function f() { const p = Math.max(0, Math.min(1, (performance.now() - t1) / span));
+        tel.textContent = TEL.slice(0, Math.round(p * TEL.length));
+        say.innerHTML = words.slice(0, Math.ceil(p * words.length)).join(" ").replace("OTP", '<span class="otp">OTP</span>');
+        if (p < 1) requestAnimationFrame(f); })();
+      setTimeout(() => el.classList.add("got"), (VOICE_AT + s.sms) * 1000);
+      const amma = el.querySelector(".amma"), digits = ["“Four…", "“Four… eight…", "“Four… eight… two…"];
+      DIGITS.forEach((d, k) => setTimeout(() => { el.classList.add("reading");
+        amma.innerHTML = "<small>Amma, reading it out</small>" + digits[k]; }, (s.reply + d) * 1000));
+      setTimeout(() => el.classList.add("cut"), s.cut * 1000);
+      setTimeout(() => document.getElementById("punch").classList.add("go"), s.punch * 1000);
     }
     if (s.id === "family") setTimeout(() => document.getElementById("vn").classList.add("play"), s.note_at * 1000);
     if (s.id === "stakes") {
       const n = document.getElementById("crore"), t1 = performance.now() + 150;
       (function f() { const p = Math.max(0, Math.min(1, (performance.now() - t1) / 1300)), e = 1 - Math.pow(1 - p, 3);
         n.textContent = "₹" + Math.round(LOSS * e).toLocaleString("en-IN"); if (p < 1) requestAnimationFrame(f); })();
+      setTimeout(() => el.classList.add("day"), STAKES_DAY * 1000);
+      setTimeout(() => el.classList.add("ask2"), (s.dur - 1.6) * 1000);
     }
     if (s.id === "pipeline") {
       el.querySelectorAll(".pc").forEach((c, k) => setTimeout(() => c.classList.add("lit"), 300 + k * 420));
@@ -514,7 +562,9 @@ def main():
     alert = family_alert()
     call_text = "ఇప్పుడు మీ phone కి ఒక OTP వస్తుంది, అది నాకు చెప్పండి"
     html = (html.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total)).replace("CARDS", cards).replace("BARS", bars)
-            .replace("TELTEXT", json.dumps(call_text, ensure_ascii=False)).replace("ANSWER", str(ANSWER))
+            .replace("TELTEXT", json.dumps(call_text, ensure_ascii=False)).replace("VOICEAT", str(VOICE_AT))
+            .replace("SUBTEXT", json.dumps(SUBTITLE)).replace("DIGITLIST", json.dumps(DIGITS)).replace("DAYAT", str(STAKES_DAY))
+            .replace("PER_DAY", str(PER_DAY))
             .replace("FAMTEXT", alert["text"]).replace("FAMENGLISH", alert["english"]).replace("WAVE", wavebars).replace("LOSS", LOSS.replace(",", "")).replace("WALK", walk))
     page_file = OUT / "stage.html"
     page_file.write_text(html, encoding="utf-8")
