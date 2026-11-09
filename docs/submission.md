@@ -9,7 +9,7 @@ Deadline: **10 November 2026, 23:59 IST**. Submit during the day.
 - [ ] Fill in **Team and contributions** below (2 lines).
 - [ ] Submit on the challenge page:
   - the written explanation below;
-  - **Project URL:** https://github.com/lucky07-07/kavach-scam-call-guardian. Its README links the 1-page solution pitch, [PITCH.md](../PITCH.md) (PDF: `docs/Kavach_pitch.pdf`);
+  - **Project URL (live link):** https://kavach-scam-call-guardian.vercel.app: the pitch, both videos and the real Kavach screen replaying three saved Telugu calls. Code: https://github.com/lucky07-07/kavach-scam-call-guardian. Its README links the 1-page solution pitch, [PITCH.md](../PITCH.md) (PDF: `docs/Kavach_pitch.pdf`);
   - **Video demo (2–3 min):** `data/demo/kavach_demo_full.mp4` (2:21: the scam call and its cost, the 8 agents, then one real run of the app with narration: warning, family alert, complaint, seal, a genuine call, the family asking). Upload it to YouTube (unlisted) or Google Drive (anyone with the link) and paste that link;
   - the trailer `data/demo/trailer/kavach_trailer.mp4` (0:60, made for the 60-second "Demo Day Drop" award);
   - the post link;
