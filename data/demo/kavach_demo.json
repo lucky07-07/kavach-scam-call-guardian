@@ -1,0 +1,22 @@
+{
+  "recorded_seconds": 132.8,
+  "evon_wait_cut": [
+    90.3,
+    114.8
+  ],
+  "sounds": [
+    [
+      8.89,
+      "te_kyc_otp_mono.wav"
+    ],
+    [
+      30.15,
+      "warning.wav"
+    ],
+    [
+      54.81,
+      "te_fraud_alert_mono.wav"
+    ]
+  ],
+  "file": "D:\\M.TECH\\SEM-3\\Blockchain\\Project\\data\\demo\\kavach_demo.mp4"
+}
