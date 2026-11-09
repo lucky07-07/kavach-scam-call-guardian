@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Kavach — solution pitch</title>
+<!-- One-page solution pitch. PDF: chrome --headless --print-to-pdf=docs/Kavach_pitch.pdf --no-pdf-header-footer docs/pitch.html -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}
+html,body{margin:0;background:#fff;color:#16181d;font-family:Inter,"Segoe UI",sans-serif;font-size:9.5pt;line-height:1.36}
+.page{width:210mm;height:297mm;box-sizing:border-box;padding:11mm 14mm 9mm;overflow:hidden}
+h1{font-size:22pt;margin:0;letter-spacing:-.6pt;font-weight:800}
+.tag{font-size:11pt;color:#4a505c;margin:3pt 0 10pt}
+h2{font-size:9pt;letter-spacing:1.4pt;text-transform:uppercase;color:#c4372c;margin:9pt 0 3pt;font-weight:800}
+p{margin:0 0 5pt}
+.big{font-size:10.2pt}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18pt}
+ol{margin:0;padding-left:15pt}ol li{margin-bottom:1.6pt}
+ul{margin:0;padding-left:13pt}ul li{margin-bottom:2pt}
+table{border-collapse:collapse;width:100%;font-size:9pt}
+td{padding:3pt 6pt 3pt 0;border-bottom:1px solid #e3e5ea;vertical-align:top}
+td:first-child{font-weight:700;white-space:nowrap}
+.stat{display:flex;gap:10pt;margin:8pt 0 2pt}
+.stat div{flex:1;border:1px solid #e3e5ea;border-radius:7pt;padding:6pt 8pt}
+.stat b{display:block;font-size:15pt;font-weight:800;color:#c4372c}
+.stat span{font-size:8.6pt;color:#4a505c}
+.foot{margin-top:9pt;padding-top:6pt;border-top:1px solid #e3e5ea;font-size:8.8pt;color:#4a505c}
+a{color:#16181d}
+</style></head><body><div class="page">
+<h1>Kavach — a second listener for scam calls</h1>
+<div class="tag">Catches scam calls in Telugu and Hindi, warns the listener, alerts the family and seals the evidence. Built entirely on Gnani AI.</div>
+
+<h2>The problem</h2>
+<p class="big">Indians lost <b>₹22,845 crore</b> to cyber fraud in 2024 (Ministry of Home Affairs, Lok Sabha, July 2025) — about
+<b>₹62 crore a day</b>. The typical attack is a phone call: someone posing as a bank, a power company or the police asks for an
+OTP, a payment or a remote-access app. The person most at risk is alone on the line, often elderly, and the call is in
+Telugu or Hindi. English-only, text-only fraud filters never hear it, and the family finds out after the money is gone.</p>
+
+<h2>The solution</h2>
+<p class="big">Kavach sits on the call as a second listener. When the caller uses a scam tactic it <b>warns the listener in
+Telugu or Hindi</b>, <b>alerts the family</b> with a text and voice note, <b>drafts the 1930 cybercrime complaint</b>, and
+<b>seals the evidence on Bitcoin</b> so no one can alter it later. Afterwards the family can ask Kavach what happened, in Telugu.</p>
+
+<div class="grid">
+<div>
+<h2>How it works: eight agents</h2>
+<ol>
+<li><b>Listener</b> (Prisma): who said what, Telugu/Hindi/English/code-mixed</li>
+<li><b>Prosecutor</b> (Evon): scam tactics, each quoting the caller</li>
+<li><b>Defender</b> (Evon): signs the call is genuine</li>
+<li><b>Judge</b> (code): a claim counts only if the caller's own words prove it</li>
+<li><b>Guardian</b> (Evon + Timbre): spoken warning; family alert</li>
+<li><b>Reporter</b> (Evon): the 1930 complaint</li>
+<li><b>Notary</b>: SHA-256 hash chain, OpenTimestamps on Bitcoin</li>
+<li><b>Family assistant</b> (Evon over MCP): answers from sealed evidence</li>
+</ol>
+</div>
+<div>
+<h2>Why it can be trusted</h2>
+<ul>
+<li><b>The LLM argues, code decides.</b> An LLM judge flagged every genuine call; with the prosecutor/defender split and a code Judge, no genuine test call has been flagged since.</li>
+<li><b>No caller words reach the listener.</b> Warnings and family alerts are built from verified tactics only.</li>
+<li><b>Private by design.</b> Only a 32-byte hash leaves the device to be timestamped.</li>
+<li><b>Evidence that holds.</b> A one-byte edit fails verification against the Bitcoin block.</li>
+</ul>
+</div>
+</div>
+
+<h2>100% Gnani · sovereign AI</h2>
+<table>
+<tr><td>Prisma v2.5</td><td>speech-to-text; separates caller from listener; Telugu, Hindi, English, code-mixed</td></tr>
+<tr><td>Evon v3.3</td><td>open-weight LLM, self-hosted (Q4_K_M on 2× T4): prosecutor, defender, warning text, complaint, assistant</td></tr>
+<tr><td>Timbre</td><td>text-to-speech: the warning to the listener and the family's voice note, in Telugu and Hindi</td></tr>
+</table>
+
+<h2>Results so far (honest, synthetic calls)</h2>
+<div class="stat">
+<div><b>22 / 22</b><span>genuine Telugu–English calls left alone (44-call set)</span></div>
+<div><b>3 / 3</b><span>Telugu calls right end to end with real Evon</span></div>
+<div><b>9–12 s</b><span>to a Telugu verdict, laptop → self-hosted Evon</span></div>
+<div><b>120</b><span>automated tests pass; seals confirmed on Bitcoin</span></div>
+</div>
+<p style="font-size:9.4pt;color:#4a505c">Scams caught on the 44-call set: 16/22 — Evon still misses some tactics; red-line rules cover OTP/PIN and remote-access requests.</p>
+
+<h2>Limits and next steps</h2>
+<p>Today calls are analysed after recording; next is streaming Prisma for true mid-call warnings. Family alerts are built,
+voiced and queued, but no SMS/WhatsApp gateway is connected yet. All test calls are synthetic (scripted, voiced by Timbre).
+Next: a gateway, more Indian languages, and a small pilot with real families.</p>
+
+<div class="foot"><b>Code:</b> github.com/lucky07-07/kavach-scam-call-guardian &nbsp;·&nbsp; <b>Videos:</b> data/demo/ in the repo
+&nbsp;·&nbsp; Gnani AI Great Indian AI Internship Challenge 2026 · #GnaniAI</div>
+</div></body></html>
