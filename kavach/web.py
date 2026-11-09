@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from kavach import evon as E, guardian as G, listener as L, notary as N, pipeline as P, transcript as T
+from kavach import evon as E, family_alert as F, guardian as G, listener as L, notary as N, pipeline as P, transcript as T
 from kavach.rules import CUES, in_caller_lines
 from kavach.run_call import RUNS, save
 
@@ -72,13 +72,16 @@ def view(result, call_id):
                           marks=marks(turn["text"], tactics) if tactics else []))
     # a safe call shows no seal, even if an earlier run of the same recording was sealed (seals are append-only)
     seal = seal_info(call_id) if result["verdict"] != "SAFE" else None
+    # runs saved before the family alert existed get it rebuilt: it is code-only, from the same verdict and evidence
+    alert = result.get("family_alert") or F.build(result["verdict"], result["tactics"], result["evidence"],
+                                                  result["warning"].get("lang", "te"), (seal or {}).get("index"))
     return {"call_id": call_id, "verdict": result["verdict"], "tactics": result["tactics"], "reason": result.get("reason", ""),
             "turns": turns, "claims": result["claims"], "benign": result["benign"], "evidence": result["evidence"],
             "verdict_without_red_lines": result.get("verdict_without_red_lines"), "warning": result["warning"],
             "report": result.get("report", ""), "timings": result.get("timings", {}),
             "listener": {k: result["transcript"].get(k) for k in ("source", "language", "speaker_assignment", "duration_s", "warnings")}
                         | {"model": (result["transcript"].get("prisma") or {}).get("model")},
-            "has_warning_audio": (RUNS / call_id / "warning.wav").exists(), "seal": seal}
+            "has_warning_audio": (RUNS / call_id / "warning.wav").exists(), "seal": seal, "family_alert": alert}
 
 
 def seal_info(call_id, packet_bytes=None):
@@ -121,6 +124,21 @@ def warning_audio(call_id: str):
     return FileResponse(f, media_type="audio/wav")
 
 
+@app.get("/api/family_alert/{call_id}")
+def family_alert_audio(call_id: str):
+    # the alert as a voice note, made by Timbre on first request and kept with the run
+    f = RUNS / call_id / "family_alert.wav"
+    if not f.exists():
+        r = RUNS / call_id / "result.json"
+        if not r.exists():
+            raise HTTPException(404, "no saved run")
+        alert = view(json.loads(r.read_text(encoding="utf-8")), call_id)["family_alert"]
+        if not alert.get("send"):
+            raise HTTPException(404, "safe call: no family alert")
+        f.write_bytes(F.voice(alert))
+    return FileResponse(f, media_type="audio/wav")
+
+
 class Analyse(BaseModel):
     call_id: str
     mode: str = "live"          # live | replay
@@ -154,6 +172,7 @@ def analyse(req: Analyse):
                             models={"stt": (t.get("prisma") or {}).get("model"), "evon": "gnani-evon-v3.3 Q4_K_M",
                                     "tts": f"{G.LANGS[warn]['model']}/{G.LANGS[warn]['voice']}"})
     save(result, wav)
+    F.queue(result["family_alert"], req.call_id)
     return view(result, req.call_id)
 
 

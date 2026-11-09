@@ -64,8 +64,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
 .err { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--warn-soft); color: var(--ink); font-size: 13.5px; }
 
 /* pipeline strip */
-.flow { display: flex; align-items: center; gap: 6px; margin: 22px 2px 6px; overflow-x: auto; padding-bottom: 4px; }
-.step { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 7px 10px 7px 8px; border-radius: 999px; color: var(--ink-3); font-size: 13px; font-weight: 600; white-space: nowrap; transition: background .25s, color .25s; }
+.flow { display: flex; align-items: center; gap: 4px; margin: 22px 2px 6px; overflow-x: auto; padding-bottom: 4px; }
+.step { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 7px 8px 7px 6px; border-radius: 999px; color: var(--ink-3); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: background .25s, color .25s; }
 .step i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; background: var(--soft); color: var(--ink-3); transition: background .25s, color .25s; }
 .step small { font-weight: 500; color: var(--ink-3); }
 .step[data-s="work"] i { background: var(--brand-soft); color: var(--brand); animation: pulse 1s infinite; }
@@ -73,7 +73,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
 .step[data-s="alert"] { color: var(--scam); } .step[data-s="alert"] i { background: var(--scam); color: #fff; }
 .step[data-s="ok"] { color: var(--safe); } .step[data-s="ok"] i { background: var(--safe); color: #fff; }
 .step[aria-expanded="true"] { background: var(--surface); box-shadow: var(--shadow); }
-.sep { flex: none; width: 14px; height: 1px; background: var(--line); }
+.sep { flex: 1 1 4px; min-width: 4px; max-width: 18px; height: 1px; background: var(--line); }
 @keyframes pulse { 50% { opacity: .45; } }
 .detail { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 14px 18px; font-size: 14px; color: var(--ink-2); margin-bottom: 6px; animation: rise .2s ease; }
 .detail h4 { margin: 0 0 6px; font-size: 13px; color: var(--ink); }
@@ -129,6 +129,10 @@ details.card summary { cursor: pointer; list-style: none; font-size: 12.5px; col
 details.card summary::-webkit-details-marker { display: none; }
 details.card summary::after { content: "+"; float: right; }
 details.card[open] summary::after { content: "–"; }
+.fam { border-left: 3px solid var(--warn); }
+.fam.urgent { border-left-color: var(--scam); background: var(--scam-soft); }
+#famBanner .card { margin-bottom: 18px; }
+#tAssist.dot::after { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--scam); margin-left: 6px; vertical-align: middle; }
 .report { white-space: pre-wrap; font-size: 13.5px; color: var(--ink-2); margin-top: 10px; }
 
 /* assistant */
@@ -192,6 +196,7 @@ details.card[open] summary::after { content: "–"; }
       <div class="side">
         <div class="verdict" id="verdict"><div class="k">Verdict</div><div class="v">—</div><p>Waiting for a call.</p></div>
         <div id="warning"></div>
+        <div id="famCard"></div>
         <div class="card hidden" id="sealCard"></div>
         <details class="card hidden" id="reportCard"><summary>Complaint for 1930 / cybercrime.gov.in</summary><div class="report" id="report"></div></details>
         <div class="small" id="timing"></div>
@@ -200,6 +205,7 @@ details.card[open] summary::after { content: "–"; }
   </section>
 
   <section id="viewAssist" class="assist hidden">
+    <div id="famBanner"></div>
     <p class="lead">Ask about a call in any language. Kavach's assistant reads the sealed evidence through its MCP tools. It can explain and verify, never change a verdict.</p>
     <div class="thread" id="thread"></div>
     <div class="ask"><input id="q" placeholder="Ask about a call…"><button class="go" id="askBtn">Ask</button></div>
@@ -220,7 +226,7 @@ const TACTICS = {
 };
 const STEPS = [
   ["listener", "Listen", "Prisma"], ["prosecutor", "Prosecute", "Evon"], ["defender", "Defend", "Evon"],
-  ["judge", "Judge", "code"], ["guardian", "Warn", "Timbre"], ["reporter", "Report", "Evon"], ["notary", "Seal", "Bitcoin"],
+  ["judge", "Judge", "code"], ["guardian", "Warn", "Timbre"], ["family", "Alert", "family"], ["reporter", "Report", "Evon"], ["notary", "Seal", "Bitcoin"],
 ];
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -277,7 +283,7 @@ function reset() {
   err(""); details = {}; open = null; detail();
   $("chat").innerHTML = '<div class="placeholder">Listening…</div>';
   $("verdict").className = "verdict"; $("verdict").innerHTML = '<div class="k">Verdict</div><div class="v">…</div><p>Thinking.</p>';
-  $("warning").innerHTML = ""; $("sealCard").classList.add("hidden"); $("reportCard").classList.add("hidden"); $("timing").textContent = "";
+  $("warning").innerHTML = ""; $("famCard").innerHTML = ""; $("sealCard").classList.add("hidden"); $("reportCard").classList.add("hidden"); $("timing").textContent = "";
 }
 
 async function analyse() {
@@ -354,12 +360,13 @@ async function reveal(r) {
     defender: `<h4>Defend · Evon</h4>${r.benign.length ? `<ul>${r.benign.map(b => `<li>${esc(b.signal)}</li>`).join("")}</ul>` : "Found no genuine-call signals."}`,
     judge: `<h4>Judge · code</h4>Kept ${kept.length} claim${kept.length === 1 ? "" : "s"} the transcript proves, rejected ${dropped.length}.${dropped.length ? `<ul>${dropped.map(c => `<li class="dropped">${TACTICS[c.tactic]}</li> <span class="why">${esc(c.check)}</span>`).join("")}</ul>` : ""}${r.evidence.some(e => e.source === "red_line") ? '<div class="why">A red-line rule in code also fired, independent of Evon.</div>' : ""}`,
     guardian: `<h4>Warn · Evon + Timbre</h4>${r.warning.text ? (r.warning.source === "evon" ? "Evon's warning passed every check (Telugu, no caller words, no numbers or links)." : `Used the approved warning${r.warning.rejected.length ? ` because Evon's text ${esc(r.warning.rejected.join(", "))}` : ""}.`) : "Stayed silent: nothing to warn about."}`,
+    family: `<h4>Alert · family</h4>${r.family_alert && r.family_alert.send ? `Alerted the family in ${r.family_alert.lang === "hi" ? "Hindi" : "Telugu"} (${r.family_alert.level === "urgent" ? "urgent" : "please check"}), built in code from the verdict, never from the caller's words. Queued for delivery; no SMS/WhatsApp gateway is connected yet.` : "Nothing sent: the call is safe."}`,
     reporter: `<h4>Report · Evon</h4>${r.report ? "Drafted the complaint (below the seal)." : "Not needed."}`,
     notary: `<h4>Seal · Bitcoin</h4>${r.seal ? `Sealed as #${r.seal.index}, linked to the previous seal, stamped via OpenTimestamps.` : "Safe calls are not sealed."}`,
   };
   const st = {};
   for (const [id] of STEPS) {
-    st[id] = id === "prosecutor" ? (kept.length ? "alert" : "ok") : id === "judge" ? (flagged ? "alert" : "ok") : (!flagged && ["guardian", "reporter", "notary"].includes(id) ? "ok" : "done");
+    st[id] = id === "prosecutor" ? (kept.length ? "alert" : "ok") : id === "judge" ? (flagged ? "alert" : "ok") : (!flagged && ["guardian", "family", "reporter", "notary"].includes(id) ? "ok" : "done");
     flow({...Object.fromEntries(STEPS.map(([s]) => [s, "work"])), ...st});
     await sleep(220);
   }
@@ -375,12 +382,23 @@ async function reveal(r) {
     $("playW").onclick = () => { a.currentTime = 0; a.play(); };
     if (r.has_warning_audio && !demo) a.play().catch(() => {});
   }
+  family(r.family_alert, r.call_id);
   seal(r.seal, r.call_id);
   if (r.report) { $("report").textContent = r.report; $("reportCard").classList.remove("hidden"); }
   const tm = r.timings || {};
   if (tm.verdict_s != null) $("timing").textContent = `Verdict in ${tm.verdict_s} s · warning ready at ${tm.warning_s} s`;
 }
 
+function family(f, callId) {
+  if (!f || !f.send) { $("famCard").innerHTML = ""; return; }
+  const card = (id) => `<div class="card fam ${f.level}"><div class="k">${f.level === "urgent" ? "Family alerted · urgent" : "Family alerted"}<button class="play" id="${id}" aria-label="Play voice note">▶</button></div>
+      <div class="say te">${esc(f.text)}</div><div class="small">${esc(f.english)}</div>
+      <div class="small">Voice note · Timbre · ${f.lang === "hi" ? "Hindi" : "Telugu"} · queued for SMS/WhatsApp (gateway not connected yet)</div></div>`;
+  $("famCard").innerHTML = card("playF"); $("famBanner").innerHTML = card("playF2");
+  $("tAssist").classList.add("dot");
+  const a = new Audio(`/api/family_alert/${callId}`);
+  for (const id of ["playF", "playF2"]) $(id).onclick = () => { a.currentTime = 0; a.play(); };
+}
 function seal(s, callId) {
   const c = $("sealCard");
   if (!s) { c.classList.add("hidden"); return; }
