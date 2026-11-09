@@ -1,10 +1,13 @@
-# Launch-style trailer for Kavach (60 s): kinetic typography, live screen footage (real clicks on the running app),
-# Timbre narration, the real Telugu and Hindi warnings, a recap montage, synthesised SFX and a 100 BPM bed; every cut
-# lands on the beat, with a silence-then-drop at the reveal and a flash + hit on the big moments.
+# Launch-style trailer for Kavach (60 s, for the "Demo Day Drop" award). Story: the scam call itself (real audio, typed
+# on screen) -> what it costs (official loss figure) -> Kavach -> how it works (eight agents, dissolving into the app's
+# own step strip) -> the real app in motion, one continuous take per scene (recorded by record_walkthrough: Analyse and
+# the Judge; the Telugu warning and the family alert, played; the seal verified and an edited copy rejected; a genuine
+# call left alone; the family's Ask tab) -> Hindi -> 100% Gnani. Timbre narration, whole sentences of the real warnings
+# (cut at their pauses), synthesised SFX and a 100 BPM bed; every scene starts on the beat.
 #   data/demo/trailer/kavach_trailer.mp4  (1920x1080)
-# Needs: narration.py run first; data/demo/kavach_demo.mp4 (the screen recording) for footage.
+# Needs: narration.py and record_walkthrough.py run first.
 # Usage: .venv\Scripts\python -m kavach.trailer.make_trailer
-import json, shutil, subprocess, sys, time, wave
+import json, math, re, shutil, subprocess, sys, time, wave
 from pathlib import Path
 
 import numpy as np
@@ -16,65 +19,60 @@ OUT = DEMO / "trailer"
 SR = 48000
 W, H = 1920, 1080
 FFMPEG = shutil.which("ffmpeg") or next(Path.home().glob("AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg*/**/bin/ffmpeg.exe"), None)
-TE_WARN, HI_WARN = ROOT / "data" / "runs" / "te_kyc_otp" / "warning.wav", DEMO / "warning_hi_template.wav"
+RUN = ROOT / "data" / "runs" / "te_kyc_otp"
+CALL, TE_WARN, FAMILY = ROOT / "data" / "test_audio" / "te_kyc_otp_mono.wav", RUN / "warning.wav", RUN / "family_alert.wav"
+HI_WARN = DEMO / "warning_hi_template.wav"
 WALK = DEMO / "walkthrough.mp4"      # from kavach.trailer.record_walkthrough: real clicks on the running screen
-SEAL_HASH = json.loads((ROOT / "data" / "ledger" / "records" / "00000.json").read_bytes())["packet_sha256"]
+CALL_FROM = 12.70                    # the caller's OTP request in the scam call (its turn starts at 12.79 s)
+LOSS = "22,845"                      # ₹ crore lost to cyber fraud in India in 2024: MHA reply in the Lok Sabha, July 2025
 
 
-# ---------------------------------------------------------------- timeline: narration-led, every cut snapped to the beat
+# ---------------------------------------------------------------- timeline: every scene starts on the beat
 BPM = 100
 BEAT = 60 / BPM
-MONTAGE = [  # rapid recap shots: (word, demo time, crop x, y, w, h in source pixels, scale)
-    ("Hears.", 18.0, 220, 220, 660, 220, 1.9), ("Judges.", 34.0, 890, 215, 490, 350, 1.8),
-    ("Warns.", 34.0, 890, 580, 490, 170, 2.0), ("Seals.", 40.0, 890, 745, 490, 128, 2.0)]
 
 
-def live_scenes():
-    # scene -> (kicker, headline, camera focus, clips); a clip is (source, second in it, seconds shown or None for the rest),
-    # "w" = the walkthrough, "d" = the demo video (the family assistant answering, with Evon live)
-    m = json.loads((DEMO / "walkthrough.json").read_text(encoding="utf-8"))
-    return {
-        "listen": ("1 · Listener · Gnani Prisma", "Press Analyse: caller and listener, separated", "30% 45%",
-                   [("w", m["scam_analyse"] - 0.7, 1.5), ("w", m["scam_done"] - 2.7, None)]),
-        "agents": ("2-4 · Prosecutor and Defender: Evon · Judge: code", "Evon's claims are checked against the caller's own words",
-                   "30% 30%", [("w", m["judge_open"] - 1.4, None)]),
-        "warn": ("5 · Guardian · Gnani Timbre", '<span class="red">Scam</span> → warned in Telugu → family alerted', "72% 55%",
-                 [("w", m["warning_play"] - 1.0, None)]),
-        "genuine": ("A genuine HDFC fraud-alert call", '<span class="green">Safe</span> → no warning, no alert', "50% 40%",
-                    [("w", m["genuine_analyse"] + 0.3, None)]),
-        "seal": ("7 · Notary · SHA-256 hash chain on Bitcoin", 'Original <span class="green">✓</span> · edited copy <span class="red">✗</span>',
-                 "60% 60%", [("w", m["seal_view"] + 0.2, 1.0), ("w", m["verify_original"] - 0.3, 0.9),
-                             ("w", m["verify_original"] + 1.3, 0.9), ("w", m["verify_edited"] - 0.3, None)]),
-        "ask": ("Family alert · then the family assistant (Evon over the Kavach MCP server)",
-                '<span class="red">Family alerted</span> · they ask, in Telugu', "50% 30%",
-                [("w", m["ask_tab"] - 0.2, 2.0), ("w", m["ask_type"] + 0.2, 1.3), ("d", 90.5, None)]),
-    }
+def pause_before(path, limit, start=0.0):
+    # the end of the last whole sentence before `limit` seconds: the start of the last pause (silencedetect) in range
+    r = subprocess.run([str(FFMPEG), "-hide_banner", "-i", str(path), "-af", "silencedetect=noise=-35dB:d=0.18", "-f", "null", "-"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    starts = [float(x) for x in re.findall(r"silence_start: ([0-9.]+)", r.stderr)]
+    fits = [x for x in starts if start + 0.5 < x <= limit]
+    return max(fits) if fits else limit
+
+
+def marks():
+    return json.loads((DEMO / "walkthrough.json").read_text(encoding="utf-8"))
 
 
 def timeline():
     vo = json.loads((OUT / "narration.json").read_text(encoding="utf-8"))
-    scenes = [  # (id, extra seconds after the narration, narration key, extra audio (file, offset, seconds), flash on the cut)
-        # sized to land just under 60 s, the length of the "Demo Day Drop" award
-        ("hook", 0.4, "hook", None, False), ("reveal", 0.5, "reveal", None, True), ("listen", 1.2, "listen", None, False),
-        ("agents", 0.5, "agents", None, False), ("warn", 4.4, "warn", (TE_WARN, 0.2, 4.1), True),
-        ("hindi", 2.8, "hindi", (HI_WARN, 0.2, 2.6), False), ("genuine", 1.0, "genuine", None, False),
-        ("seal", 1.0, "seal", None, False), ("ask", 1.0, "ask", None, False),
-        ("montage", BEAT * len(MONTAGE), None, None, True), ("sovereign", 0.8, "sovereign", None, True),
-        ("end", 0.4, "end", None, True)]
+    m = marks()
+    warn_take = m["warn_click"] - 0.5                     # the warn scene starts half a second before the play click
+    te_end, fam_end, hi_end = pause_before(TE_WARN, 3.0), pause_before(FAMILY, 3.6), pause_before(HI_WARN, 3.2)
+    call_end = pause_before(CALL, CALL_FROM + 3.8, CALL_FROM)
+    scenes = [  # (id, at least seconds, narration, extra audio [(file, at, from, to)], flash on the cut, walkthrough take start)
+        ("call", 6.0, None, [(CALL, 0.3, CALL_FROM, call_end)], False, None),
+        ("stakes", 0, "stakes", [], False, None),
+        ("reveal", 0, "reveal", [], True, None),
+        ("pipeline", 5.4, "agents", [], False, m["take_listen"]),
+        ("listen", 6.0, "listen", [], False, m["take_listen"]),
+        ("warn", 0, None, [(TE_WARN, 0.5, 0, te_end), (FAMILY, m["family_click"] - warn_take, 0, fam_end)], True, warn_take),
+        ("hindi", 0, "hindi", [(HI_WARN, 1.12, 0, hi_end)], False, None),
+        ("genuine", 4.2, "genuine", [], False, m["take_genuine"]),
+        ("seal", 3.6, "seal", [], False, m["take_seal"]),
+        ("ask", 3.6, "ask", [], False, m["take_ask"]),
+        ("sovereign", 4.8, "sovereign", [], True, None),
+        ("end", 0, "end", [], True, None)]
     t, out = BEAT, []
-    for sid, extra, key, extra_audio, flash in scenes:
-        lead = 0.35 if key else 0.0
-        speech = vo[key] if key else 0.0
-        out.append({"id": sid, "start": round(t, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
-                    "extra": None if not extra_audio else {"file": str(extra_audio[0]), "at": round(t + lead + speech + extra_audio[1], 3),
-                                                           "len": extra_audio[2]}})
-        spoken_end = t + lead + speech + (extra_audio[1] + extra_audio[2] if extra_audio else 0)
-        nxt = round((t + lead + speech + extra) / BEAT) * BEAT          # cut on the nearest beat ...
-        while nxt < spoken_end + 0.2:                                    # ... but never over speech
-            nxt += BEAT
-        out[-1]["dur"] = round(nxt - t, 3)
-        t = nxt
-    return out, round(t + 0.8, 2)
+    for sid, least, key, extras, flash, take in scenes:
+        lead = 0.25 if key else 0.0
+        need = max(least, lead + (vo[key] if key else 0) + 0.2, *[at + (b - a) + 0.2 for _, at, a, b in extras])
+        dur = math.ceil(need / BEAT - 1e-6) * BEAT
+        out.append({"id": sid, "start": round(t, 3), "dur": round(dur, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
+                    "take": take, "extras": [{"file": str(f), "at": round(t + at, 3), "from": a, "to": b} for f, at, a, b in extras]})
+        t += dur
+    return out, round(t + 0.3, 2)
 
 
 # ---------------------------------------------------------------- audio: music bed and SFX, synthesised
@@ -191,30 +189,31 @@ def retime(video, scenes, total):
 
 def build_audio(scenes, total):
     at = {s["id"]: s["start"] for s in scenes}
+    m = marks()
     bed = music(total, at["reveal"], at["reveal"] - 0.45, at["end"])
     voice, fx = np.zeros_like(bed), np.zeros_like(bed)
     for s in scenes:
         if s["vo"]:
             place(voice, read_wav(OUT / f"vo_{s['vo']}.wav"), s["vo_at"], 1.0)
-        if s["extra"]:
-            clip = read_wav(Path(s["extra"]["file"]))[: int(s["extra"]["len"] * SR)]
-            clip *= np.minimum(1, (s["extra"]["len"] - np.arange(len(clip)) / SR) / 0.4).clip(0, 1)
-            place(voice, clip, s["extra"]["at"], 0.95)
+        for e in s["extras"]:
+            clip = read_wav(Path(e["file"]))[int(e["from"] * SR): int(e["to"] * SR)]
+            clip *= np.minimum(1, (len(clip) - np.arange(len(clip))) / (0.12 * SR)).clip(0, 1)   # end on the pause, softly
+            place(voice, clip, e["at"], 0.95)
         if s["flash"]:
             place(fx, impact(1.2), s["start"], 0.75)
-        elif s["id"] != "hook":
+        elif s["id"] != "call":
             place(fx, whoosh(0.4), max(0, s["start"] - 0.2), 0.45)
     place(fx, riser(2.0), at["reveal"] - 2.45, 0.6)                    # riser, then silence, then the drop
     place(fx, impact(), at["reveal"], 0.6)
+    place(fx, impact(0.8), at["stakes"] + 0.3, 0.35)                   # the figure lands
     place(fx, riser(1.4), at["sovereign"] - 1.4, 0.5)
-    for i in range(1, len(MONTAGE)):
-        place(fx, impact(0.6), at["montage"] + i * BEAT, 0.55)
-    place(fx, tick(), at["seal"] + 1.7, 1.0)
-    place(fx, tick(f=900), at["seal"] + 2.5, 1.0)
+    for i in range(8):                                                 # the pipeline lights up, agent by agent
+        place(fx, tick(0.05, 1400 + 90 * i), at["pipeline"] + 0.3 + i * 0.42, 0.45)
+    for k in ("seal_ok", "seal_bad"):                                  # the two verify clicks
+        place(fx, tick(), at["seal"] + m[k] - m["take_seal"], 0.9)
     for i in range(3):
         place(fx, tick(0.06, 1600), at["sovereign"] + 1.4 + i * BEAT, 0.7)
-    # duck the music under speech
-    speech = np.abs(voice) > 0.01
+    speech = np.abs(voice) > 0.01                                      # duck the music under speech
     duck = 1 - 0.6 * lowpass(speech.astype(np.float32), int(0.3 * SR))
     mix = bed * duck * 0.9 + voice * 1.0 + fx * 0.8
     mix = np.tanh(mix * 1.1) * 0.92
@@ -226,6 +225,17 @@ def build_audio(scenes, total):
 
 
 # ---------------------------------------------------------------- the stage
+LIVE = {  # scene -> (kicker, headline, camera focus)
+    "listen": ("1-4 · Prisma listens · Evon argues · the Judge is code", "Analyse: who said what, then the verdict, and why", "45% 30%"),
+    "warn": ("5 · Guardian · Gnani Timbre", '<span class="red">Scam</span>: the listener is warned, the family alerted', "70% 35%"),
+    "genuine": ("A genuine HDFC fraud-alert call", '<span class="green">Safe</span>: no warning, no alert', "60% 35%"),
+    "seal": ("7 · Notary · SHA-256 hash chain on Bitcoin", 'Original <span class="green">✓</span> · one byte edited <span class="red">✗</span>', "55% 70%"),
+    "ask": ("8 · Family assistant · Evon over the Kavach MCP server", "The alert is waiting. They ask, in Telugu", "50% 25%"),
+}
+AGENTS = [("Listen", "Prisma", "hears the call", ""), ("Prosecute", "Evon", "argues: scam", ""), ("Defend", "Evon", "argues: genuine", ""),
+          ("Judge", "code", "decides", "judge"), ("Warn", "Timbre", "warns · alerts family", "voice"), ("Report", "Evon", "drafts the complaint", ""),
+          ("Seal", "Bitcoin", "seals the evidence", "chain"), ("Ask", "MCP", "answers the family", "")]
+
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Telugu:wght@500;700&family=Noto+Sans+Devanagari:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -233,16 +243,32 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .scene{position:absolute;inset:0;display:grid;place-items:center;opacity:0;visibility:hidden}
 .scene.on{visibility:visible;animation:fadein .3s ease forwards}
 @keyframes fadein{to{opacity:1}}
-.big{font-size:96px;font-weight:800;letter-spacing:-3px;line-height:1.05;text-align:center;max-width:1500px}
-.dim{color:#7d8492}.red{color:#ff5a4e}.green{color:#4fd08f}.amber{color:#f3b13f}
-.word{display:inline-block;opacity:0;transform:translateY(40px) scale(.96);filter:blur(10px)}
-.on .word{animation:wordin .55s cubic-bezier(.2,.8,.2,1) forwards}
 @keyframes wordin{to{opacity:1;transform:none;filter:none}}
-.quote{font-size:64px;font-weight:700;margin:14px 0;opacity:0;transform:translateX(-60px)}
-.on .quote{animation:slide .5s cubic-bezier(.2,.8,.2,1) forwards}
-@keyframes slide{to{opacity:1;transform:none}}
+.red{color:#ff5a4e}.green{color:#4fd08f}.amber{color:#f3b13f}
 .te{font-family:"Noto Sans Telugu",Inter,sans-serif}.hi{font-family:"Noto Sans Devanagari",Inter,sans-serif}
-.tag{font-size:34px;color:#8a909c;margin-top:8px;letter-spacing:.5px}
+.in{opacity:0;transform:translateY(24px);filter:blur(8px)}
+.on .in{animation:wordin .55s cubic-bezier(.2,.8,.2,1) var(--d,0s) forwards}
+.kick{font-size:26px;letter-spacing:4px;text-transform:uppercase;color:#f3b13f;font-weight:700;text-align:center}
+/* the call */
+.callbox{width:1500px;text-align:center}
+.live{display:inline-flex;align-items:center;gap:14px;font-size:28px;color:#c6cbd4;font-weight:600;padding:12px 26px;border-radius:999px;background:#14171d;border:1px solid #262b36}
+.live i{width:14px;height:14px;border-radius:50%;background:#ff5a4e;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.bars{display:flex;gap:7px;justify-content:center;align-items:center;height:90px;margin:34px 0 10px}
+.bars b{width:9px;border-radius:5px;background:#ff5a4e;height:12px}
+.on .bars b{animation:eq .42s ease-in-out infinite alternate;animation-delay:var(--b)}
+.bars.stop b{animation:none!important;height:6px!important;background:#3a3f4a}
+@keyframes eq{to{height:84px}}
+.tel{font-size:62px;font-weight:700;min-height:80px;line-height:1.3}
+.en{font-size:34px;color:#9aa1ad;margin-top:16px}
+.three{display:flex;gap:28px;justify-content:center;margin-top:60px}
+.three span{font-size:40px;font-weight:700;padding:14px 30px;border-radius:16px;background:#14171d;border:1px solid #262b36}
+/* the stakes */
+.stat .n{font-size:200px;font-weight:800;letter-spacing:-7px;line-height:1;text-align:center}
+.stat .n small{font-size:90px;letter-spacing:-2px;color:#ff5a4e;margin-left:24px}
+.stat .t{font-size:46px;color:#c6cbd4;text-align:center;margin-top:18px}
+.stat .src{font-size:24px;color:#6f7684;text-align:center;margin-top:36px}
+/* the reveal */
 .logo{display:flex;align-items:center;gap:36px;opacity:0;transform:scale(1.3);filter:blur(20px)}
 .on .logo{animation:logo .9s cubic-bezier(.16,.9,.2,1) forwards}
 @keyframes logo{to{opacity:1;transform:none;filter:none}}
@@ -253,118 +279,95 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .glow{position:absolute;width:1400px;height:1400px;border-radius:50%;background:radial-gradient(circle,rgba(255,90,78,.18),transparent 60%);opacity:0}
 .on .glow{animation:glow 3s ease forwards}
 @keyframes glow{to{opacity:1}}
-/* real screen footage, cropped to the part of the app that matters (--x --y --w --h in source pixels, --s scale) */
-.frame{position:absolute;left:50%;top:calc(150px + (900px - var(--h) * var(--s) * 1px) / 2);width:calc(var(--w) * var(--s) * 1px);
-  height:calc(var(--h) * var(--s) * 1px);border-radius:20px;overflow:hidden;background:#f4f5f7;border:1px solid #2a2f3a;
-  box-shadow:0 30px 120px rgba(0,0,0,.6);transform:translateX(-50%) scale(.985)}
-.on .frame{animation:settle 7s ease-out forwards}
-@keyframes settle{to{transform:translateX(-50%) scale(1.01)}}
-.frame video{position:absolute;width:calc(1600px * var(--s));height:calc(1000px * var(--s));
-  left:calc(var(--x) * var(--s) * -1px);top:calc(var(--y) * var(--s) * -1px)}
-.gn{display:flex;gap:36px;justify-content:center;margin-top:56px}
-.gm{width:400px;padding:36px 32px;border-radius:28px;background:#11141a;border:1px solid #262b36;text-align:left;opacity:0;transform:translateY(30px)}
-.on .gm{animation:wordin .55s forwards}
-.gm b{display:block;font-size:56px;font-weight:800;letter-spacing:-1.5px}
-.gm i{display:block;font-style:normal;font-size:26px;color:#f3b13f;font-weight:700;margin:4px 0 14px}
-.gm span{font-size:24px;color:#9aa1ad;line-height:1.4}
-.kick{font-size:26px;letter-spacing:4px;text-transform:uppercase;color:#f3b13f;font-weight:700;text-align:center}
-.zero{font-size:30px;color:#c6cbd4;text-align:center;margin-top:46px;opacity:0}
-.on .zero{animation:wordin .6s 4.2s forwards}
+/* the pipeline */
+.pwrap{transition:all .7s cubic-bezier(.6,0,.3,1)}
+.merge .pwrap{opacity:0;transform:translateY(-260px) scale(.7)}
+.prow{position:relative;display:flex;gap:14px;margin-top:44px}
+.line{position:absolute;left:40px;right:40px;top:50%;height:2px;background:#232833}
+.dot{position:absolute;top:-7px;left:0;width:16px;height:16px;border-radius:50%;background:#f2f3f6;box-shadow:0 0 24px 6px rgba(255,255,255,.45);opacity:0}
+.on .dot{animation:run 3.36s .3s linear forwards}
+@keyframes run{0%{left:0;opacity:1}96%{opacity:1}100%{left:100%;opacity:0}}
+.pc{position:relative;width:196px;height:228px;border-radius:26px;background:#13161c;border:2px solid #232833;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;opacity:.28;transform:scale(.92);transition:all .3s ease;text-align:center}
+.pc em{font-style:normal;font-size:18px;color:#6f7684;font-weight:700}
+.pc b{font-size:30px}.pc span{font-size:20px;color:#8a909c}.pc p{margin:8px 10px 0;font-size:19px;color:#c6cbd4;line-height:1.25;min-height:48px}
+.pc.lit{opacity:1;transform:none;border-color:#4b5263}
+.pc.judge.lit{border-color:#ff5a4e;box-shadow:0 0 60px rgba(255,90,78,.4)}.pc.judge.lit b{color:#ff5a4e}
+.pc.voice.lit{border-color:#8b85ff}.pc.chain.lit{border-color:#4fd08f}
+.pcap{font-size:38px;color:#c6cbd4;margin-top:48px;text-align:center;opacity:0}
+.on .pcap{animation:wordin .6s 3.5s forwards}
+/* live footage in a window */
+.win{position:absolute;left:160px;top:160px;width:1600px;height:900px;border-radius:18px;overflow:hidden;background:#f6f7f9;
+  border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}
+.win video{width:100%;height:calc(100% + 14px);object-fit:cover;object-position:top;transform-origin:var(--fo,50% 30%)}
+.on .win.cam video{animation:cam 7s ease-in-out forwards}
+@keyframes cam{to{transform:scale(1.05)}}
+.pwin{opacity:0;transition:opacity .8s ease}
+.merge .pwin{opacity:1}
 .label{position:absolute;left:0;right:0;top:34px;text-align:center;font-size:44px;font-weight:700;opacity:0;transform:translateY(-14px)}
 .on .label{animation:wordin .5s .15s forwards}
 .label small{display:block;font-size:22px;font-weight:600;color:#8a909c;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-.pipe{display:flex;gap:22px;align-items:center}
-.node{width:190px;height:190px;border-radius:30px;background:#13161c;border:2px solid #232833;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:10px;opacity:.25;transform:scale(.9);transition:all .35s ease}
-.node b{font-size:30px}.node span{font-size:21px;color:#8a909c}
-.node.lit{opacity:1;transform:none;border-color:#4b5263}.node.judge.lit{border-color:#ff5a4e;box-shadow:0 0 60px rgba(255,90,78,.35)}
-.node.voice.lit{border-color:#8b85ff}.node.chain.lit{border-color:#4fd08f}
-.cap{font-size:44px;color:#c6cbd4;margin-top:60px;text-align:center;opacity:0}
-.on .cap{animation:wordin .6s 2.8s forwards}
+/* hindi, sovereign, end */
 .warncard{max-width:1500px;text-align:center}
-.say{font-size:58px;font-weight:700;line-height:1.5;opacity:0}
-.on .say{animation:wordin .7s var(--d,4.4s) forwards}
-.gloss{font-size:32px;color:#9aa1ad;margin-top:28px;opacity:0}
-.on .gloss{animation:wordin .7s var(--g,5s) forwards}
-.verdict{font-size:150px;font-weight:800;letter-spacing:-5px;color:#ff5a4e;opacity:0;transform:scale(1.4)}
-.on .verdict{animation:logo .6s .15s cubic-bezier(.16,.9,.2,1) forwards, fadeout .4s 3.9s forwards}
-@keyframes fadeout{to{opacity:0;transform:scale(.95)}}
-.layer{position:absolute;inset:0;display:grid;place-items:center}
-.hash{font-family:"JetBrains Mono",monospace;font-size:44px;letter-spacing:2px;color:#4fd08f;max-width:1500px;word-break:break-all;text-align:center}
-.chips{display:flex;gap:24px;margin-top:50px;justify-content:center}
-.chip{font-size:34px;font-weight:700;padding:18px 30px;border-radius:999px;opacity:0;transform:translateY(20px)}
-.chip.ok{background:#12291d;color:#4fd08f}.chip.no{background:#34191a;color:#ff7a6e}.chip.btc{background:#1c2028;color:#f3b13f}
-.on .chip.btc{animation:wordin .5s .9s forwards}.on .chip.ok{animation:wordin .5s 1.6s forwards}.on .chip.no{animation:wordin .5s 2.4s forwards}
-.stat{position:absolute;inset:0;display:grid;place-items:center;opacity:0}
-.stat .n{font-size:220px;font-weight:800;letter-spacing:-8px;line-height:1}
-.stat .t{font-size:44px;color:#9aa1ad;margin-top:10px;text-align:center}
+.tag{font-size:34px;color:#8a909c}
+.say{font-size:66px;font-weight:700;line-height:1.5;margin-top:20px}
+.gloss{font-size:34px;color:#9aa1ad;margin-top:24px}
+.big{font-size:96px;font-weight:800;letter-spacing:-3px;line-height:1.05;text-align:center}
+.gn{display:flex;gap:36px;justify-content:center;margin-top:56px}
+.gm{width:400px;padding:36px 32px;border-radius:28px;background:#11141a;border:1px solid #262b36;text-align:left}
+.gm b{display:block;font-size:56px;font-weight:800;letter-spacing:-1.5px}
+.gm i{display:block;font-style:normal;font-size:26px;color:#f3b13f;font-weight:700;margin:4px 0 14px}
+.gm span{font-size:24px;color:#9aa1ad;line-height:1.4}
 .end .name{font-size:150px}
-.win{position:absolute;left:160px;top:160px;width:1600px;height:900px;border-radius:18px;overflow:hidden;background:#f6f7f9;
-  border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}
-.clip{position:absolute;inset:0;visibility:hidden}.clip.on{visibility:visible}
-.clip video{width:100%;height:calc(100% + 14px);object-fit:cover;object-position:top;transform-origin:var(--fo);transform:scale(1)}
-.scene.on .clip.on video{animation:cam 5s ease-in-out forwards}
-@keyframes cam{to{transform:scale(1.07)}}
+.hash-tags{font-size:28px;color:#6f7684;margin-top:40px;text-align:center}
 .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
 .flash.go{animation:flash .32s ease-out}
 @keyframes flash{from{opacity:.85}to{opacity:0}}
-.mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
-#montage .mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
-.shot{position:absolute;left:50%;top:150px;height:880px;transform:translateX(-50%);border-radius:20px;overflow:hidden;border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}.shot img{height:100%;display:block}
-.hash-tags{font-size:28px;color:#6f7684;margin-top:40px;text-align:center;opacity:0}
-.on .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
-.flash.go{animation:flash .32s ease-out}
-@keyframes flash{from{opacity:.85}to{opacity:0}}
-.mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
-#montage .mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
-.shot{position:absolute;left:50%;top:150px;height:880px;transform:translateX(-50%);border-radius:20px;overflow:hidden;border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}.shot img{height:100%;display:block}
-.hash-tags{animation:wordin .7s 1.4s forwards}
 </style></head><body>
-<div class="scene" id="hook"><div><div class="big"><span class="word">Every</span> <span class="word" style="animation-delay:.12s">day,</span>
- <span class="word" style="animation-delay:.24s">scammers</span> <span class="word" style="animation-delay:.36s">call</span><br>
- <span class="word red" style="animation-delay:.6s">India's</span> <span class="word red" style="animation-delay:.72s">elderly.</span></div>
- <div style="margin-top:56px;text-align:center"><div class="quote te" style="font-size:48px;animation-delay:2.3s;color:#c6cbd4">“మీ KYC expire అయింది. OTP చెప్పండి.”</div>
- <div class="quote hi" style="font-size:48px;animation-delay:2.9s;color:#c6cbd4">“आपका KYC expire हो गया है। OTP बताइए।”</div></div></div></div>
+<div class="scene" id="call"><div class="callbox">
+ <div class="live in"><i></i>On a call with Amma · the caller says he is "SBI head office"</div>
+ <div class="bars" id="bars">BARS</div>
+ <div class="tel te" id="tel"></div>
+ <div class="en in" style="--d:1.2s">“You'll get an OTP on your phone now. Tell it to me.”</div>
+ <div class="three"><span class="in" style="--d:4.0s">Alone on the line.</span><span class="in" style="--d:4.45s">In her own language.</span>
+  <span class="in" style="--d:4.9s">It sounds official.</span></div></div></div>
+<div class="scene" id="stakes"><div class="stat">
+ <div class="n"><span id="crore">₹0</span><small>crore</small></div>
+ <div class="t in" style="--d:.6s">lost to cyber fraud in India in 2024</div>
+ <div class="src in" style="--d:1.2s">Ministry of Home Affairs, reply in the Lok Sabha, July 2025 (NCRP / CFCFRMS data)</div></div></div>
 <div class="scene" id="reveal"><div class="glow"></div><div><div class="logo"><div class="mark">K</div><div class="name">Kavach</div></div>
  <div class="sub">A second listener on the call · built on Gnani AI</div></div></div>
+<div class="scene" id="pipeline"><div class="pwrap"><div class="kick">How Kavach works · eight agents, one call</div>
+ <div class="prow"><div class="line"><i class="dot"></i></div>CARDS</div>
+ <div class="pcap">Only the <span class="red">Judge</span> decides, and it is code: a claim counts only if the caller's own words prove it.</div></div>
+ <div class="win pwin" style="--fo:45% 30%"><video id="v_pipeline" src="WALK" muted playsinline preload="auto"></video></div></div>
 LIVE_listen
-LIVE_agents
 LIVE_warn
 <div class="scene" id="hindi"><div class="warncard">
- <div class="tag">Hindi · Timbre</div>
- <div class="say hi" style="--d:.9s">सावधान! यह धोखाधड़ी वाली कॉल है।<br>OTP, PIN किसी को मत बताइए।<br>अभी फ़ोन काट दीजिए।</div>
- <div class="gloss" style="--g:1.6s">“Careful, this is a fraud call. Don't tell anyone your OTP or PIN. Hang up now.”</div></div></div>
+ <div class="tag in">The same warning, in Hindi · Timbre</div>
+ <div class="say hi in" style="--d:1.2s">सावधान! यह धोखाधड़ी वाली कॉल है।</div>
+ <div class="gloss in" style="--d:1.8s">“Careful! This is a fraud call.”</div></div></div>
 LIVE_genuine
 LIVE_seal
 LIVE_ask
-<div class="scene" id="montage">MONTAGE</div>
 <div class="scene" id="sovereign"><div>
  <div class="kick">Sovereign AI for India</div>
- <div class="big" style="margin-top:18px">100% Gnani. <span class="amber">Trained in India.</span></div>
+ <div class="big in" style="margin-top:18px">100% Gnani. <span class="amber">Trained in India.</span></div>
  <div class="gn">
-  <div class="gm" style="animation-delay:1.4s"><b>Prisma</b><i>hears</i><span>Speech to text: Telugu, Hindi, English, code-mixed. Separates caller from listener.</span></div>
-  <div class="gm" style="animation-delay:2.15s"><b>Evon</b><i>reasons</i><span>Open-weight 30B LLM, self-hosted by us. Prosecutor, defender, report, family assistant.</span></div>
-  <div class="gm" style="animation-delay:2.9s"><b>Timbre</b><i>speaks</i><span>Text to speech: the warning, in Telugu and Hindi.</span></div></div>
- <div class="zero">No model from outside Gnani anywhere in the call path.</div></div></div>
+  <div class="gm in" style="--d:1.4s"><b>Prisma</b><i>hears</i><span>Speech to text: Telugu, Hindi, English, code-mixed. Separates caller from listener.</span></div>
+  <div class="gm in" style="--d:2.0s"><b>Evon</b><i>reasons</i><span>Open-weight 30B LLM, self-hosted by us. Prosecutor, defender, report, family assistant.</span></div>
+  <div class="gm in" style="--d:2.6s"><b>Timbre</b><i>speaks</i><span>Text to speech: the warning and the family alert, in Telugu and Hindi.</span></div></div></div></div>
 <div class="scene end" id="end"><div style="text-align:center"><div class="logo" style="justify-content:center"><div class="mark">K</div><div class="name">Kavach</div></div>
  <div class="sub" style="font-size:52px;color:#f2f3f6">Keep the listener safe.</div>
- <div class="hash-tags">#GnaniAI · #GreatIndianAIInternshipChallenge</div></div></div>
+ <div class="hash-tags in" style="--d:1.2s">#GnaniAI · #GreatIndianAIInternshipChallenge</div></div></div>
 <script>
-const TL = TIMELINE, BEAT_MS = BEATMS, FOOT = Object.assign(LFOOT, MFOOT);
+const TL = TIMELINE, TEL = TELTEXT;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-function scramble(el, target, ms) {
-  const hex = "0123456789abcdef", t0 = performance.now();
-  (function f() {
-    const p = Math.min(1, (performance.now() - t0) / ms), k = Math.floor(p * target.length);
-    el.textContent = target.slice(0, k) + Array.from({length: target.length - k}, () => hex[Math.random() * 16 | 0]).join("");
-    if (p < 1) requestAnimationFrame(f);
-  })();
-}
 window.prep = async () => {
-  // seek every clip before the clock starts, so a cut never shows a stale or loading frame
-  await Promise.all(Object.entries(FOOT).map(([id, t]) => new Promise(ok => {
-    const v = document.getElementById("v_" + id);
-    const go = () => { v.addEventListener("seeked", ok, {once: true}); v.currentTime = t; };
+  // seek every take before the clock starts, so no cut shows a stale or loading frame
+  await Promise.all(TL.filter(s => s.take !== null).map(s => new Promise(ok => {
+    const v = document.getElementById("v_" + s.id);
+    const go = () => { v.addEventListener("seeked", ok, {once: true}); v.currentTime = s.take; };
     v.readyState >= 1 ? go() : v.addEventListener("loadedmetadata", go, {once: true});
   })));
 };
@@ -376,14 +379,23 @@ window.run = async () => {
     document.getElementById("sync").style.background = i % 2 ? "#f0f" : "#0ff";   // marks the cut for the retiming
     document.querySelectorAll(".scene.on").forEach(e => e.classList.remove("on"));
     const el = document.getElementById(s.id); el.classList.add("on");
-    const v = document.getElementById("v_" + s.id);
-    if (v) v.play();
     if (s.flash) { const f = document.getElementById("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
-    el.querySelectorAll(".clip").forEach(c => setTimeout(() => {   // live scenes: real clips, cut in sequence
-      el.querySelectorAll(".clip").forEach(x => x.classList.remove("on")); c.classList.add("on"); c.querySelector("video").play();
-    }, +c.dataset.at));
-    if (s.id === "montage") document.querySelectorAll(".mshot").forEach((m, i) => setTimeout(() => {
-      document.querySelectorAll(".mshot").forEach(x => x.classList.remove("on")); m.classList.add("on"); }, i * BEAT_MS));
+    if (s.id !== "pipeline" && s.take !== null) document.getElementById("v_" + s.id).play();
+    if (s.id === "call") {   // the caller's words type out with the audio; the sound bars settle when he stops
+      const tel = document.getElementById("tel"), t1 = performance.now() + 300, len = TEL.length;
+      (function f() { const p = Math.max(0, Math.min(1, (performance.now() - t1) / 3300));
+        tel.textContent = TEL.slice(0, Math.round(p * len)); if (p < 1) requestAnimationFrame(f); })();
+      setTimeout(() => document.getElementById("bars").classList.add("stop"), 3900);
+    }
+    if (s.id === "stakes") {
+      const n = document.getElementById("crore"), t1 = performance.now() + 150;
+      (function f() { const p = Math.max(0, Math.min(1, (performance.now() - t1) / 1300)), e = 1 - Math.pow(1 - p, 3);
+        n.textContent = "₹" + Math.round(LOSS * e).toLocaleString("en-IN"); if (p < 1) requestAnimationFrame(f); })();
+    }
+    if (s.id === "pipeline") {
+      el.querySelectorAll(".pc").forEach((c, k) => setTimeout(() => c.classList.add("lit"), 300 + k * 420));
+      setTimeout(() => el.classList.add("merge"), (s.dur - 1.3) * 1000);   // dissolve into the app's own step strip
+    }
   }
   await sleep((TOTAL - TL[TL.length - 1].start) * 1000);
   return (performance.now() - t0) / 1000;
@@ -392,41 +404,28 @@ window.run = async () => {
 <div id="sync" style="position:fixed;right:0;bottom:0;width:10px;height:10px;background:#f0f;z-index:99"></div></body></html>"""
 
 
-PAGE_LIVE = {}
-
-
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     scenes, total = timeline()
-    print(f"{len(scenes)} scenes, {total} s")
+    print(f"{len(scenes)} scenes, {total} s:", ", ".join(f"{s['id']} {s['dur']}" for s in scenes))
+    if total > 60:
+        sys.exit("over 60 s: shorten a scene")
     audio = build_audio(scenes, total)
-    footage = (DEMO / "kavach_demo.mp4").as_uri()
-    montage = "".join(
-        f'<div class="mshot"><div class="frame" style="--x:{x};--y:{y};--w:{w};--h:{h};--s:{sc}">'
-        f'<video id="v_m{i}" src="FOOTAGE" muted playsinline preload="auto"></video></div><div class="label">{word}</div></div>'
-        for i, (word, _, x, y, w, h, sc) in enumerate(MONTAGE))
     small = OUT / "walk_1600.mp4"          # the window is 1600x900, so decode no more than that
     if not small.exists() or small.stat().st_mtime < WALK.stat().st_mtime:
         subprocess.run([str(FFMPEG), "-y", "-v", "error", "-i", str(WALK), "-vf", "scale=1600:900", "-c:v", "libx264", "-crf", "18",
                         "-preset", "fast", "-an", str(small)], check=True)
-    walk, foot = small.as_uri(), {}
-    for sid, (kicker, head, focus, clips) in live_scenes().items():
-        at, parts = 0.0, []
-        for i, (src, t, dur) in enumerate(clips):
-            foot[f"{sid}_{i}"] = round(t, 2)
-            parts.append(f'<div class="clip" data-at="{round(at * 1000)}" style="--fo:{focus}"><video id="v_{sid}_{i}" '
-                         f'src="{walk if src == "w" else footage}" muted playsinline preload="auto"></video></div>')
-            at += dur or 0
-        live = (f'<div class="scene" id="{sid}"><div class="win">{"".join(parts)}</div>'
-                f'<div class="label"><small>{kicker}</small>{head}</div></div>')
-        PAGE_LIVE[sid] = live
+    walk = small.as_uri()
     html = PAGE
-    for sid, live in PAGE_LIVE.items():
-        html = html.replace(f"LIVE_{sid}", live)
-    html = (html.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total)).replace("LFOOT", json.dumps(foot))
-            .replace("MONTAGE", montage).replace("BEATMS", str(round(BEAT * 1000)))
-            .replace("MFOOT", json.dumps({f"m{i}": m[1] for i, m in enumerate(MONTAGE)}))
-            .replace("FOOTAGE", footage).replace('"HASH"', json.dumps(SEAL_HASH)))
+    for sid, (kicker, head, focus) in LIVE.items():
+        html = html.replace(f"LIVE_{sid}", f'<div class="scene" id="{sid}"><div class="win cam" style="--fo:{focus}"><video id="v_{sid}" '
+                            f'src="{walk}" muted playsinline preload="auto"></video></div><div class="label"><small>{kicker}</small>{head}</div></div>')
+    cards = "".join(f'<div class="pc {cls}"><em>{i + 1}</em><b>{name}</b><span>{by}</span><p>{what}</p></div>'
+                    for i, (name, by, what, cls) in enumerate(AGENTS))
+    bars = "".join(f'<b style="--b:{(i * 0.137) % 0.42:.2f}s"></b>' for i in range(28))
+    call_text = "ఇప్పుడు మీ phone కి ఒక OTP వస్తుంది, అది నాకు చెప్పండి"
+    html = (html.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total)).replace("CARDS", cards).replace("BARS", bars)
+            .replace("TELTEXT", json.dumps(call_text, ensure_ascii=False)).replace("LOSS", LOSS.replace(",", "")).replace("WALK", walk))
     page_file = OUT / "stage.html"
     page_file.write_text(html, encoding="utf-8")
     rec = OUT / "rec"
@@ -435,16 +434,14 @@ def main():
         browser = p.chromium.launch(channel="chrome", headless=True, args=["--autoplay-policy=no-user-gesture-required"])
         ctx = browser.new_context(viewport={"width": W, "height": H}, record_video_dir=str(rec), record_video_size={"width": W, "height": H})
         page = ctx.new_page()
-        t_open = time.monotonic()
         page.goto(page_file.as_uri())
         page.wait_for_load_state("networkidle")
         page.evaluate("document.fonts.ready")
         page.evaluate("prep()")
-        lead = time.monotonic() - t_open          # blank/loading time at the head of the recording
         took = page.evaluate("run()")
         ctx.close(); browser.close()
     video = next(rec.glob("*.webm"))
-    print(f"stage ran {took:.1f} s after {lead:.1f} s of loading")
+    print(f"stage ran {took:.1f} s")
     out = OUT / "kavach_trailer.mp4"
     cmd = [str(FFMPEG), "-y", "-i", str(video), "-i", str(audio), "-filter_complex", retime(video, scenes, total), "-map", "[v]", "-map", "1:a",
            "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",

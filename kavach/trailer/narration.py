@@ -7,17 +7,16 @@ from kavach.timbre import Timbre, wav_of
 
 OUT = Path(__file__).parent.parent.parent / "data" / "demo" / "trailer"
 VOICE, MODEL, RATE = "Shubham", "timbre-v3.0", 24000   # "energetic, confident"
-LINES = {   # 60-second cut for the "Demo Day Drop" award (best 60-second demo video)
-    "hook":      "Every day, scammers call India's elderly. In their own language.",
+LINES = {   # 60-second cut for the "Demo Day Drop" award (best 60-second demo video); the scam call itself opens it, unnarrated
+    "stakes":    "Twenty-two thousand crore rupees, lost to cyber fraud in 2024.",
     "reveal":    "Meet Kavach. A second listener on the call.",
-    "listen":    "Gnani Prisma hears every word, and knows who the caller is.",
     "agents":    "Eight agents. Evon argues both sides. But code decides.",
-    "warn":      "It's a scam. Kavach warns them, in Telugu.",
+    "listen":    "Gnani Prisma hears every word, and knows who the caller is.",
     "hindi":     "In Hindi.",
     "genuine":   "And a real bank call? Kavach stays silent.",
     "seal":      "The evidence is sealed on Bitcoin.",
-    "ask":       "The family is alerted at once, and can ask Kavach anything.",
-    "sovereign": "Fully Indian. Every model is Gnani's. Prisma. Evon. Timbre.",
+    "ask":       "And the family can ask Kavach anything.",
+    "sovereign": "Fully Indian. Fully Gnani. Prisma, Evon, Timbre.",
     "end":       "Kavach. Keep the listener safe.",
 }
 

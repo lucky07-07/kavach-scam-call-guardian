@@ -1,7 +1,7 @@
-# Records a 1080p walkthrough of the real screen for the trailer: a visible cursor picks a call, presses Analyse,
-# opens the Judge's reasoning, plays the warning, verifies the seal and an edited copy, runs a genuine call, then opens
-# Ask Kavach (where the family alert waits) and types a question. Every click is a real click on the running app (saved
-# runs, Replay mode). The moments the trailer cuts to are written next to the video, read from the video itself: a
+# Records a 1080p walkthrough of the real screen for the trailer, as one continuous take per trailer scene: Analyse a
+# scam call and open the Judge's reasoning; play the warning and the family alert; verify the seal and an edited copy;
+# run a genuine call; open Ask Kavach (where the family alert waits) and type a question. Every click is a real click on
+# the running app (saved runs, Replay mode), drawn with a visible cursor. The moments the trailer cuts to are written next to the video, read from the video itself: a
 # 10 px square in the bottom-right corner flips colour at each one (the recording drifts against the wall clock), and
 # the trailer crops that corner away.
 #   data/demo/walkthrough.mp4, data/demo/walkthrough.json
@@ -71,81 +71,87 @@ def main():
             if click:
                 page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
 
+        def top(sel=None, offset=90):
+            # instant scroll between takes: to the top, or with an element just below the top edge
+            page.evaluate("([sel, off]) => { if (!sel) return scrollTo(0, 0); const el = document.querySelector(sel);"
+                          " scrollTo(0, scrollY + el.getBoundingClientRect().top - off); }",
+                          [sel, offset])
+
         page.goto(APP)
         page.wait_for_selector("#call option", state="attached")
-        page.mouse.move(W / 2, H / 2)
-        wait(1200)
-        mark("start")
-
-        # a scam call
-        go("#call", click=False)
         page.select_option("#call", "te_kyc_otp")
+        page.click("#mReplay")
+        page.mouse.move(W * 0.55, H * 0.32)
+        wait(1500)
+
+        # take 1: Analyse a scam call, then open the Judge's reasoning
+        mark("take_listen")
+        wait(400)
+        go("#go", steps=18, pause=250)
+        mark("analyse_click")
+        page.wait_for_selector("#famCard .fam")
+        wait(700)
+        go('.step[data-id="judge"]', steps=18, pause=250)
+        wait(2600)
+        go('.step[data-id="judge"]', click=True, steps=4, pause=100)    # close it again, between takes
+
+        # take 2: the warning to the listener, then the family alert, both played
+        top("#warning")
+        page.mouse.move(W * 0.5, H * 0.45)
         wait(500)
-        go("#mReplay")
+        mark("take_warn")
         wait(300)
-        mark("scam_analyse")
-        go("#go")
-        page.wait_for_selector("#famCard .fam")
-        mark("scam_done")
-        wait(1500)
-        go('.step[data-id="judge"]')
-        mark("judge_open")
-        wait(2600)
-        go('.step[data-id="judge"]')
-        wait(400)
-        go("#playW")
-        mark("warning_play")
-        wait(2200)
-        go("#playF")
-        mark("family_play")
-        wait(2200)
+        go("#playW", steps=18, pause=250)
+        mark("warn_click")
+        wait(2900)
+        go("#playF", steps=18, pause=250)
+        mark("family_click")
+        wait(3600)
 
-        # the seal: verify the original, then an edited copy
-        page.mouse.move(W * 0.62, H * 0.6, steps=10)
-        for _ in range(6):
-            page.mouse.wheel(0, 160)
-            wait(90)
+        # take 3: the seal, verified as it is and as an edited copy
+        top("#sealCard", 260)
+        page.mouse.move(W * 0.45, H * 0.5)
         wait(500)
-        mark("seal_view")
-        go("#vO")
-        page.wait_for_selector("#vres .ok", timeout=60000)      # the check reads the Bitcoin block, so it takes a moment
-        mark("verify_original")
-        wait(1400)
-        go("#vE")
+        mark("take_seal")
+        wait(300)
+        go("#vO", steps=16, pause=200)
+        page.wait_for_selector("#vres .ok", timeout=60000)
+        mark("seal_ok")
+        wait(700)
+        go("#vE", steps=14, pause=200)
         page.wait_for_selector("#vres .no", timeout=60000)
-        mark("verify_edited")
-        wait(2200)
-        for _ in range(8):
-            page.mouse.wheel(0, -200)
-            wait(70)
-        wait(500)
+        mark("seal_bad")
+        wait(1800)
 
-        # a genuine bank call
-        go("#call", click=False)
+        # take 4: a genuine bank call, on a fresh page so the scam's result is not on screen
+        page.goto(APP)
+        page.wait_for_selector("#call option", state="attached")
+        page.click("#mReplay")
         page.select_option("#call", "te_fraud_alert")
-        wait(400)
-        mark("genuine_analyse")
-        go("#go")
+        page.mouse.move(W * 0.55, H * 0.32)
+        page.wait_for_load_state("networkidle")
+        wait(4500)                # the status check (Evon health, with one retry) settles first
+        mark("take_genuine")
+        wait(150)
+        go("#go", steps=18, pause=250)
         page.wait_for_function("document.querySelector('#verdict').classList.contains('SAFE')")
-        mark("genuine_done")
-        wait(2600)
+        mark("genuine_safe")
+        wait(1800)
 
-        # the family's side: the alert is waiting on Ask Kavach; they ask about it
-        go("#call", click=False)
+        # take 5: the family's side: the alert waits on Ask Kavach; they start asking (the scam call is replayed first,
+        # off camera, since the alert comes from it)
         page.select_option("#call", "te_kyc_otp")
-        go("#go")
+        page.click("#go")
         page.wait_for_selector("#famCard .fam")
-        wait(600)
-        mark("ask_tab")
-        go("#tAssist")
-        wait(1600)
-        go("#q")
-        mark("ask_type")
-        page.keyboard.type(QUESTION, delay=55)
-        wait(500)
-        page.mouse.move(*(lambda b: (b["x"] + b["width"] / 2, b["y"] + b["height"] / 2))(page.locator("#askBtn").bounding_box()), steps=20)
-        mark("ask_ready")
-        wait(1500)
+        page.mouse.move(W * 0.6, H * 0.3)
+        wait(400)
+        mark("take_ask")
+        wait(200)
+        go("#tAssist", steps=16, pause=200)
+        wait(900)
+        go("#q", steps=16, pause=150)
+        page.keyboard.type(QUESTION, delay=32)
+        wait(1200)
         mark("end")
         wait(800)                 # let the last flip reach the recording
         ctx.close()
