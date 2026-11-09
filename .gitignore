@@ -20,6 +20,8 @@ data/demo/trailer/rec/
 data/demo/trailer/frames/
 data/demo/trailer/*.wav
 data/demo/trailer/stage.html
+data/demo/trailer/walk_*.mp4
+data/demo/rec_walk/
 
 # early ideation and design scratch, Kaggle push copies
 multi_agent_ideation/

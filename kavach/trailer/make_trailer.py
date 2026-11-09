@@ -1,4 +1,4 @@
-# Launch-style trailer for Kavach (60 s): kinetic typography, real screen footage cropped into a window, an animated pipeline,
+# Launch-style trailer for Kavach (60 s): kinetic typography, live screen footage (real clicks on the running app),
 # Timbre narration, the real Telugu and Hindi warnings, a recap montage, synthesised SFX and a 100 BPM bed; every cut
 # lands on the beat, with a silence-then-drop at the reveal and a flash + hit on the big moments.
 #   data/demo/trailer/kavach_trailer.mp4  (1920x1080)
@@ -17,6 +17,7 @@ SR = 48000
 W, H = 1920, 1080
 FFMPEG = shutil.which("ffmpeg") or next(Path.home().glob("AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg*/**/bin/ffmpeg.exe"), None)
 TE_WARN, HI_WARN = ROOT / "data" / "runs" / "te_kyc_otp" / "warning.wav", DEMO / "warning_hi_template.wav"
+WALK = DEMO / "walkthrough.mp4"      # from kavach.trailer.record_walkthrough: real clicks on the running screen
 SEAL_HASH = json.loads((ROOT / "data" / "ledger" / "records" / "00000.json").read_bytes())["packet_sha256"]
 
 
@@ -28,14 +29,36 @@ MONTAGE = [  # rapid recap shots: (word, demo time, crop x, y, w, h in source pi
     ("Warns.", 34.0, 890, 580, 490, 170, 2.0), ("Seals.", 40.0, 890, 745, 490, 128, 2.0)]
 
 
+def live_scenes():
+    # scene -> (kicker, headline, camera focus, clips); a clip is (source, second in it, seconds shown or None for the rest),
+    # "w" = the walkthrough, "d" = the demo video (the family assistant answering, with Evon live)
+    m = json.loads((DEMO / "walkthrough.json").read_text(encoding="utf-8"))
+    return {
+        "listen": ("1 · Listener · Gnani Prisma", "Press Analyse: caller and listener, separated", "30% 45%",
+                   [("w", m["scam_analyse"] - 0.7, 1.5), ("w", m["scam_done"] - 2.7, None)]),
+        "agents": ("2-4 · Prosecutor and Defender: Evon · Judge: code", "Evon's claims are checked against the caller's own words",
+                   "30% 30%", [("w", m["judge_open"] - 1.4, None)]),
+        "warn": ("5 · Guardian · Gnani Timbre", '<span class="red">Scam</span> → warned in Telugu → family alerted', "72% 55%",
+                 [("w", m["warning_play"] - 1.0, None)]),
+        "genuine": ("A genuine HDFC fraud-alert call", '<span class="green">Safe</span> → no warning, no alert', "50% 40%",
+                    [("w", m["genuine_analyse"] + 0.3, None)]),
+        "seal": ("7 · Notary · SHA-256 hash chain on Bitcoin", 'Original <span class="green">✓</span> · edited copy <span class="red">✗</span>',
+                 "60% 60%", [("w", m["seal_view"] + 0.2, 1.0), ("w", m["verify_original"] - 0.3, 0.9),
+                             ("w", m["verify_original"] + 1.3, 0.9), ("w", m["verify_edited"] - 0.3, None)]),
+        "ask": ("Family alert · then the family assistant (Evon over the Kavach MCP server)",
+                '<span class="red">Family alerted</span> · they ask, in Telugu', "50% 30%",
+                [("w", m["ask_tab"] - 0.2, 2.0), ("w", m["ask_type"] + 0.2, 1.3), ("d", 90.5, None)]),
+    }
+
+
 def timeline():
     vo = json.loads((OUT / "narration.json").read_text(encoding="utf-8"))
     scenes = [  # (id, extra seconds after the narration, narration key, extra audio (file, offset, seconds), flash on the cut)
         # sized to land just under 60 s, the length of the "Demo Day Drop" award
         ("hook", 0.4, "hook", None, False), ("reveal", 0.5, "reveal", None, True), ("listen", 1.2, "listen", None, False),
-        ("agents", 0.8, "agents", None, False), ("warn", 4.4, "warn", (TE_WARN, 0.2, 4.1), True),
-        ("hindi", 3.4, "hindi", (HI_WARN, 0.2, 3.2), False), ("genuine", 1.4, "genuine", None, False),
-        ("seal", 1.2, "seal", None, False), ("ask", 1.4, "ask", None, False),
+        ("agents", 0.5, "agents", None, False), ("warn", 4.4, "warn", (TE_WARN, 0.2, 4.1), True),
+        ("hindi", 2.8, "hindi", (HI_WARN, 0.2, 2.6), False), ("genuine", 1.0, "genuine", None, False),
+        ("seal", 1.0, "seal", None, False), ("ask", 1.0, "ask", None, False),
         ("montage", BEAT * len(MONTAGE), None, None, True), ("sovereign", 0.8, "sovereign", None, True),
         ("end", 0.4, "end", None, True)]
     t, out = BEAT, []
@@ -134,6 +157,36 @@ def place(track, clip, at, gain=1.0):
     b = min(len(track), a + len(clip))
     if b > a:
         track[a:b] += clip[:b - a] * gain
+
+
+def sync_flips(video, fps=30):
+    # seconds at which the 10 px sync square in the bottom-right corner changes colour (magenta <-> cyan)
+    raw = subprocess.run([str(FFMPEG), "-v", "error", "-i", str(video), "-vf", f"fps={fps},crop=4:4:1914:1074,scale=1:1",
+                          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+    px = [tuple(raw[i:i + 3]) for i in range(0, len(raw) - 2, 3)]
+    colour = ["m" if r > 150 and g < 110 and b > 150 else "c" if g > 150 and r < 110 and b > 150 else None for r, g, b in px]
+    flips, last = [], "m"
+    for i, c in enumerate(colour):              # a flip counts once the new colour holds for two frames
+        if c and c != last and i + 1 < len(colour) and colour[i + 1] == c:
+            flips.append(i / fps)
+            last = c
+    return flips
+
+
+def retime(video, scenes, total):
+    # headless screen recordings drift against the wall clock when the page is busy (several videos decoding), so each
+    # scene is stretched or squeezed back onto its planned start, keeping the picture on the narration and the beat
+    v = sync_flips(video)
+    if len(v) != len(scenes):
+        sys.exit(f"sync square: {len(v)} flips for {len(scenes)} scenes")
+    pts = [(v[0] - scenes[0]["start"], 0.0)] + [(vi, s["start"]) for vi, s in zip(v, scenes)] + [(v[-1] + total - scenes[-1]["start"], total)]
+    parts = []
+    for j, ((a, ta), (b, tb)) in enumerate(zip(pts, pts[1:])):
+        parts.append(f"[0:v]trim=start={max(a, 0):.3f}:end={b:.3f},setpts=(PTS-STARTPTS)*{(tb - ta) / max(b - a, 1e-3):.5f}[s{j}]")
+    drift = max(abs((b - pts[0][0]) - tb) for b, tb in pts)
+    print(f"retimed {len(pts) - 1} segments; largest drift {drift:.2f} s")
+    return ";".join(parts) + ";" + "".join(f"[s{j}]" for j in range(len(pts) - 1)) + \
+        f"concat=n={len(pts) - 1}:v=1:a=0,fps=30,drawbox=x=1906:y=1066:w=14:h=14:color=0x07080b:t=fill[v]"
 
 
 def build_audio(scenes, total):
@@ -246,17 +299,25 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .stat .n{font-size:220px;font-weight:800;letter-spacing:-8px;line-height:1}
 .stat .t{font-size:44px;color:#9aa1ad;margin-top:10px;text-align:center}
 .end .name{font-size:150px}
+.win{position:absolute;left:160px;top:160px;width:1600px;height:900px;border-radius:18px;overflow:hidden;background:#f6f7f9;
+  border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}
+.clip{position:absolute;inset:0;visibility:hidden}.clip.on{visibility:visible}
+.clip video{width:100%;height:calc(100% + 14px);object-fit:cover;object-position:top;transform-origin:var(--fo);transform:scale(1)}
+.scene.on .clip.on video{animation:cam 5s ease-in-out forwards}
+@keyframes cam{to{transform:scale(1.07)}}
 .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
 .flash.go{animation:flash .32s ease-out}
 @keyframes flash{from{opacity:.85}to{opacity:0}}
 .mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
-.mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
+#montage .mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
+.shot{position:absolute;left:50%;top:150px;height:880px;transform:translateX(-50%);border-radius:20px;overflow:hidden;border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}.shot img{height:100%;display:block}
 .hash-tags{font-size:28px;color:#6f7684;margin-top:40px;text-align:center;opacity:0}
 .on .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
 .flash.go{animation:flash .32s ease-out}
 @keyframes flash{from{opacity:.85}to{opacity:0}}
 .mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
-.mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
+#montage .mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
+.shot{position:absolute;left:50%;top:150px;height:880px;transform:translateX(-50%);border-radius:20px;overflow:hidden;border:1px solid #2a2f3a;box-shadow:0 30px 120px rgba(0,0,0,.6)}.shot img{height:100%;display:block}
 .hash-tags{animation:wordin .7s 1.4s forwards}
 </style></head><body>
 <div class="scene" id="hook"><div><div class="big"><span class="word">Every</span> <span class="word" style="animation-delay:.12s">day,</span>
@@ -266,29 +327,16 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
  <div class="quote hi" style="font-size:48px;animation-delay:2.9s;color:#c6cbd4">“आपका KYC expire हो गया है। OTP बताइए।”</div></div></div></div>
 <div class="scene" id="reveal"><div class="glow"></div><div><div class="logo"><div class="mark">K</div><div class="name">Kavach</div></div>
  <div class="sub">A second listener on the call · built on Gnani AI</div></div></div>
-<div class="scene" id="listen"><div class="frame" style="--x:200;--y:200;--w:1200;--h:400;--s:1.4"><video id="v_listen" src="FOOTAGE" muted playsinline preload="auto"></video></div>
- <div class="label"><small>1 · Listener · Gnani Prisma</small>Caller and listener, separated: Telugu · Hindi · English</div></div>
-<div class="scene" id="agents"><div><div class="pipe" id="pipe">
- <div class="node voice"><b>Listen</b><span>Prisma</span></div><div class="node"><b>Prosecute</b><span>Evon</span></div>
- <div class="node"><b>Defend</b><span>Evon</span></div><div class="node judge"><b>Judge</b><span>code</span></div>
- <div class="node voice"><b>Warn</b><span>Timbre</span></div><div class="node"><b>Report</b><span>Evon</span></div>
- <div class="node chain"><b>Seal</b><span>Bitcoin</span></div><div class="node"><b>Ask</b><span>MCP</span></div></div>
- <div class="cap">The verdict is <span class="red">code</span>, not an LLM: only the caller's own words count as proof.</div></div></div>
-<div class="scene" id="warn"><div class="frame" style="--x:200;--y:210;--w:1200;--h:790;--s:1.06"><video id="v_warn" src="FOOTAGE" muted playsinline preload="auto"></video></div>
- <div class="label"><small>Judge · Guardian · Notary</small><span class="red">Scam</span> → warning spoken in Telugu → evidence sealed</div></div>
+LIVE_listen
+LIVE_agents
+LIVE_warn
 <div class="scene" id="hindi"><div class="warncard">
  <div class="tag">Hindi · Timbre</div>
  <div class="say hi" style="--d:.9s">सावधान! यह धोखाधड़ी वाली कॉल है।<br>OTP, PIN किसी को मत बताइए।<br>अभी फ़ोन काट दीजिए।</div>
  <div class="gloss" style="--g:1.6s">“Careful, this is a fraud call. Don't tell anyone your OTP or PIN. Hang up now.”</div></div></div>
-<div class="scene" id="genuine"><div class="frame" style="--x:200;--y:210;--w:1200;--h:610;--s:1.38"><video id="v_genuine" src="FOOTAGE" muted playsinline preload="auto"></video></div>
- <div class="label"><small>A genuine HDFC fraud-alert call</small><span class="green">Safe</span> → no warning</div></div>
-<div class="scene" id="seal"><div style="text-align:center">
- <div class="tag" style="margin-bottom:24px">Evidence fingerprint · SHA-256</div>
- <div class="hash" id="hash"></div>
- <div class="chips"><div class="chip btc">Confirmed on Bitcoin · block 974,389</div></div>
- <div class="chips"><div class="chip ok">✓ Original matches</div><div class="chip no">✗ 1 byte changed — fails</div></div></div></div>
-<div class="scene" id="ask"><div class="frame" style="--x:300;--y:85;--w:1000;--h:380;--s:1.6"><video id="v_ask" src="FOOTAGE" muted playsinline preload="auto"></video></div>
- <div class="label"><small>8 · Family assistant · Evon over the Kavach MCP server</small><span class="te">“అమ్మకి వచ్చిన చివరి call ఏంటి?”</span></div></div>
+LIVE_genuine
+LIVE_seal
+LIVE_ask
 <div class="scene" id="montage">MONTAGE</div>
 <div class="scene" id="sovereign"><div>
  <div class="kick">Sovereign AI for India</div>
@@ -302,7 +350,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
  <div class="sub" style="font-size:52px;color:#f2f3f6">Keep the listener safe.</div>
  <div class="hash-tags">#GnaniAI · #GreatIndianAIInternshipChallenge</div></div></div>
 <script>
-const TL = TIMELINE, BEAT_MS = BEATMS, FOOT = Object.assign({listen: 13.6, warn: 31.0, genuine: 79.0, ask: 90.5}, MFOOT);
+const TL = TIMELINE, BEAT_MS = BEATMS, FOOT = Object.assign(LFOOT, MFOOT);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function scramble(el, target, ms) {
   const hex = "0123456789abcdef", t0 = performance.now();
@@ -322,23 +370,29 @@ window.prep = async () => {
 };
 window.run = async () => {
   const t0 = performance.now();
-  for (const s of TL) {
+  for (const [i, s] of TL.entries()) {
     const due = t0 + s.start * 1000 - performance.now();
     if (due > 0) await sleep(due);
+    document.getElementById("sync").style.background = i % 2 ? "#f0f" : "#0ff";   // marks the cut for the retiming
     document.querySelectorAll(".scene.on").forEach(e => e.classList.remove("on"));
     const el = document.getElementById(s.id); el.classList.add("on");
     const v = document.getElementById("v_" + s.id);
     if (v) v.play();
     if (s.flash) { const f = document.getElementById("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
+    el.querySelectorAll(".clip").forEach(c => setTimeout(() => {   // live scenes: real clips, cut in sequence
+      el.querySelectorAll(".clip").forEach(x => x.classList.remove("on")); c.classList.add("on"); c.querySelector("video").play();
+    }, +c.dataset.at));
     if (s.id === "montage") document.querySelectorAll(".mshot").forEach((m, i) => setTimeout(() => {
       document.querySelectorAll(".mshot").forEach(x => x.classList.remove("on")); m.classList.add("on"); }, i * BEAT_MS));
-    if (s.id === "agents") document.querySelectorAll("#pipe .node").forEach((n, i) => setTimeout(() => n.classList.add("lit"), 250 + i * 300));
-    if (s.id === "seal") scramble(document.getElementById("hash"), "HASH", 800);
   }
   await sleep((TOTAL - TL[TL.length - 1].start) * 1000);
   return (performance.now() - t0) / 1000;
 };
-</script><div class="flash" id="flash"></div></body></html>"""
+</script><div class="flash" id="flash"></div>
+<div id="sync" style="position:fixed;right:0;bottom:0;width:10px;height:10px;background:#f0f;z-index:99"></div></body></html>"""
+
+
+PAGE_LIVE = {}
 
 
 def main():
@@ -351,7 +405,25 @@ def main():
         f'<div class="mshot"><div class="frame" style="--x:{x};--y:{y};--w:{w};--h:{h};--s:{sc}">'
         f'<video id="v_m{i}" src="FOOTAGE" muted playsinline preload="auto"></video></div><div class="label">{word}</div></div>'
         for i, (word, _, x, y, w, h, sc) in enumerate(MONTAGE))
-    html = (PAGE.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total))
+    small = OUT / "walk_1600.mp4"          # the window is 1600x900, so decode no more than that
+    if not small.exists() or small.stat().st_mtime < WALK.stat().st_mtime:
+        subprocess.run([str(FFMPEG), "-y", "-v", "error", "-i", str(WALK), "-vf", "scale=1600:900", "-c:v", "libx264", "-crf", "18",
+                        "-preset", "fast", "-an", str(small)], check=True)
+    walk, foot = small.as_uri(), {}
+    for sid, (kicker, head, focus, clips) in live_scenes().items():
+        at, parts = 0.0, []
+        for i, (src, t, dur) in enumerate(clips):
+            foot[f"{sid}_{i}"] = round(t, 2)
+            parts.append(f'<div class="clip" data-at="{round(at * 1000)}" style="--fo:{focus}"><video id="v_{sid}_{i}" '
+                         f'src="{walk if src == "w" else footage}" muted playsinline preload="auto"></video></div>')
+            at += dur or 0
+        live = (f'<div class="scene" id="{sid}"><div class="win">{"".join(parts)}</div>'
+                f'<div class="label"><small>{kicker}</small>{head}</div></div>')
+        PAGE_LIVE[sid] = live
+    html = PAGE
+    for sid, live in PAGE_LIVE.items():
+        html = html.replace(f"LIVE_{sid}", live)
+    html = (html.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total)).replace("LFOOT", json.dumps(foot))
             .replace("MONTAGE", montage).replace("BEATMS", str(round(BEAT * 1000)))
             .replace("MFOOT", json.dumps({f"m{i}": m[1] for i, m in enumerate(MONTAGE)}))
             .replace("FOOTAGE", footage).replace('"HASH"', json.dumps(SEAL_HASH)))
@@ -374,8 +446,8 @@ def main():
     video = next(rec.glob("*.webm"))
     print(f"stage ran {took:.1f} s after {lead:.1f} s of loading")
     out = OUT / "kavach_trailer.mp4"
-    cmd = [str(FFMPEG), "-y", "-ss", f"{lead:.2f}", "-i", str(video), "-i", str(audio), "-map", "0:v", "-map", "1:a",
-           "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "30",
+    cmd = [str(FFMPEG), "-y", "-i", str(video), "-i", str(audio), "-filter_complex", retime(video, scenes, total), "-map", "[v]", "-map", "1:a",
+           "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
            "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",   # social-media loudness
            "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(out)]
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")

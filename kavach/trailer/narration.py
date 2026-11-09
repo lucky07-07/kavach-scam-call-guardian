@@ -16,7 +16,7 @@ LINES = {   # 60-second cut for the "Demo Day Drop" award (best 60-second demo v
     "hindi":     "In Hindi.",
     "genuine":   "And a real bank call? Kavach stays silent.",
     "seal":      "The evidence is sealed on Bitcoin.",
-    "ask":       "Later, the family just asks.",
+    "ask":       "The family is alerted at once, and can ask Kavach anything.",
     "sovereign": "Fully Indian. Every model is Gnani's. Prisma. Evon. Timbre.",
     "end":       "Kavach. Keep the listener safe.",
 }

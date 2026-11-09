@@ -1,0 +1,17 @@
+{
+  "start": 4.57,
+  "scam_analyse": 6.93,
+  "scam_done": 19.0,
+  "judge_open": 21.27,
+  "warning_play": 25.57,
+  "family_play": 28.43,
+  "seal_view": 31.87,
+  "verify_original": 38.6,
+  "verify_edited": 47.2,
+  "genuine_analyse": 51.67,
+  "genuine_done": 54.73,
+  "ask_tab": 68.07,
+  "ask_type": 71.17,
+  "ask_ready": 76.17,
+  "end": 77.27
+}
