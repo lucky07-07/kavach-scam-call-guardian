@@ -1,0 +1,157 @@
+{
+  "call_id": "te_fraud_alert",
+  "verdict": "SAFE",
+  "tactics": [],
+  "reason": "The transcript shows a caller claiming to be from HDFC bank fraud monitoring, reporting an unauthorized transaction and requesting action. The user denies the transaction, and the caller confirms blocking the card and advising to visit a branch or use the app. No OTP or PIN is requested. This aligns with a legitimate bank's response to a reported fraud, making it safe.",
+  "evidence": [],
+  "claims": [
+    {
+      "tactic": "money_or_fee_request",
+      "quote": "For each item, answer whether the CALLER does it in this call:",
+      "check": "not in caller lines"
+    },
+    {
+      "tactic": "otp_pin_password_request",
+      "quote": "We will never ask for OTP/PIN, telling the listener not to share details on the phone, pointing to the official number, branch or app, and cash payment on delivery of an order are all present=false.",
+      "check": "not in caller lines"
+    }
+  ],
+  "benign": [
+    {
+      "signal": "Caller: నేను HDFC bank fraud monitoring team నుంచి మాట్లాడుతున్నాను మీ card మీద ఇప్పుడే ఎనిమిది వేల ఐదు వందలు rupees online transaction వచ్చింది అది మీరు చేశారా",
+      "quote": "Caller: నేను HDFC bank fraud monitoring team నుంచి మాట్లాడుతున్నాను మీ card మీద ఇప్పుడే ఎనిమిది వేల ఐదు వందలు rupees online transaction వచ్చింది అది మీరు చేశారా"
+    },
+    {
+      "signal": "Caller: సరే మీ card ని మేము temporary గా block చేశాం కొత్త card కోసం మీ దగ్గరలోని branch కి వెళ్ళండి లేదా app లో request పెట్టండి మేము మిమ్మల్ని OTP లేదా PIN అడగము",
+      "quote": "Caller: సరే మీ card ని మేము temporary గా block చేశాం కొత్త card కోసం మీ దగ్గరలోని branch కి వెళ్ళండి లేదా app లో request పెట్టండి మేము మిమ్మల్ని OTP లేదా PIN అడగము"
+    }
+  ],
+  "verdict_without_red_lines": "SAFE",
+  "warning": {
+    "text": "",
+    "source": "silent",
+    "rejected": []
+  },
+  "report": "",
+  "transcript": {
+    "schema": "kavach.transcript.v1",
+    "call_id": "te_fraud_alert",
+    "source": "prisma-batch-diarized",
+    "language": "te-IN",
+    "audio_sha256": "4164172a8777ce8ae56dc6a5c1ade92c67c1a6f04497ec7f73714bf0bb1ba8b4",
+    "duration_s": 25.3,
+    "speaker_assignment": "most_words",
+    "turns": [
+      {
+        "speaker": "caller",
+        "text": "నేను HDFC bank fraud monitoring team నుంచి మాట్లాడుతున్నాను మీ card మీద ఇప్పుడే ఎనిమిది వేల ఐదు వందలు rupees online transaction వచ్చింది అది మీరు చేశారా",
+        "start": 0,
+        "end": 10.04,
+        "raw_speaker": "1",
+        "prisma_text": "నేను హెచ్డిఎఫ్సి బ్యాంక్ ఫ్రాడ్ మానిటరింగ్ టీమ్ నుంచి మాట్లాడుతున్నాను మీ కార్డు మీద ఇప్పుడే ఎనిమిది వేల ఐదు వందలు రూపీస్ ఆన్లైన్ ట్రాన్సాక్షన్ వచ్చింది అది మీరు చేశారా"
+      },
+      {
+        "speaker": "listener",
+        "text": "లేదు నేను చేయలేదు",
+        "start": 10.04,
+        "end": 12.158,
+        "raw_speaker": "2"
+      },
+      {
+        "speaker": "caller",
+        "text": "సరే మీ card ని మేము temporary గా block చేశాం కొత్త card కోసం మీ దగ్గరలోని branch కి వెళ్ళండి లేదా app లో request పెట్టండి మేము మిమ్మల్ని OTP లేదా PIN అడగము",
+        "start": 12.158,
+        "end": 24.096,
+        "raw_speaker": "1",
+        "prisma_text": "సరే మీ కార్డుని మేము టెంపరరీ గా బ్లాక్ చేశాం కొత్త కార్డు కోసం మీ దగ్గరలోని బ్రాంచ్ కి వెళ్ళండి లేదా యాప్ లో రిక్వెస్ట్ పెట్టండి మేము మిమ్మల్ని ఓటీపీ లేదా"
+      }
+    ],
+    "prisma": {
+      "job_id": "01a1bc9c-784c-7ebf-bf38-71c580189019",
+      "status": "COMPLETED",
+      "model": "gnani-prisma-v2.5",
+      "config": {
+        "model": "gnani-prisma-v2.5",
+        "language_code": "te-IN",
+        "mode": "transcribe",
+        "bias_list": [
+          "OTP",
+          "UPI",
+          "KYC",
+          "PIN",
+          "CVV",
+          "IFSC",
+          "NEFT",
+          "IMPS",
+          "RTGS",
+          "Aadhaar",
+          "PAN",
+          "RBI",
+          "CBI",
+          "SEBI",
+          "PhonePe",
+          "Paytm",
+          "GPay",
+          "BHIM",
+          "Mobikwik",
+          "Freecharge",
+          "AnyDesk",
+          "TeamViewer",
+          "QuickSupport",
+          "APK",
+          "SBI",
+          "HDFC",
+          "ICICI",
+          "Axis",
+          "Kotak",
+          "Canara",
+          "IndusInd",
+          "Airtel",
+          "Jio",
+          "BSNL",
+          "Vodafone",
+          "FedEx",
+          "BlueDart",
+          "DTDC",
+          "Amazon",
+          "Flipkart",
+          "LIC",
+          "EMI",
+          "refund",
+          "cashback",
+          "password",
+          "netbanking",
+          "debit",
+          "credit",
+          "QR",
+          "deactivate",
+          "customs",
+          "parcel",
+          "arrest",
+          "warrant",
+          "challan",
+          "TSSPDCL"
+        ],
+        "bias_score": 1.0,
+        "with_diarization": true,
+        "num_speakers": 2
+      },
+      "files": [
+        "d16a2a73-db76-46a4-b0b1-d43fc155655f"
+      ],
+      "refined_turns": 1
+    },
+    "warnings": [
+      "1 turn(s) re-transcribed per turn (batch dropped words)",
+      "punctuation not restored on 3 of 3 turns (Evon changed words); rules read Prisma's text there"
+    ],
+    "created_at": "2026-11-08T19:22:50Z"
+  },
+  "timings": {
+    "punctuate_s": 2.5,
+    "verdict_s": 9.9,
+    "warning_s": 12.4,
+    "total_s": 12.4
+  },
+  "seal": null
+}
