@@ -97,6 +97,7 @@ understands, and afterwards the family has no trustworthy record to give the pol
 > What surprised me: Telugu speech recognition writes "OTP" as "ఓటీపీ", and one dropped word can turn "we will **not** ask for your PIN" into a scam. Real audio teaches you things text never does.
 >
 > Try it (the real screen, replaying saved calls): https://kavach-scam-call-guardian.vercel.app
+> Code: https://github.com/lucky07-07/kavach-scam-call-guardian
 >
 > Would you want this on your parents' phone?
 >
