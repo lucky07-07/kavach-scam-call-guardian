@@ -1,0 +1,61 @@
+{
+  "held_out": {
+    "rl_policy": {
+      "scams_warned": "740/1000",
+      "scams_warned_in_time": "616/1000",
+      "false_alarms": "310/1000",
+      "mean_turns_before_harm": 0.36,
+      "mean_reward": 0.052
+    },
+    "judge_first_evidence": {
+      "scams_warned": "759/1000",
+      "scams_warned_in_time": "627/1000",
+      "false_alarms": "335/1000",
+      "mean_turns_before_harm": 0.35,
+      "mean_reward": 0.049
+    },
+    "judge_or_two_soft_signs": {
+      "scams_warned": "759/1000",
+      "scams_warned_in_time": "628/1000",
+      "false_alarms": "342/1000",
+      "mean_turns_before_harm": 0.37,
+      "mean_reward": 0.043
+    }
+  },
+  "train": {
+    "rl_policy": {
+      "scams_warned": "2158/3000",
+      "scams_warned_in_time": "1785/3000",
+      "false_alarms": "855/3000",
+      "mean_turns_before_harm": 0.34,
+      "mean_reward": 0.051
+    },
+    "judge_first_evidence": {
+      "scams_warned": "2210/3000",
+      "scams_warned_in_time": "1810/3000",
+      "false_alarms": "922/3000",
+      "mean_turns_before_harm": 0.31,
+      "mean_reward": 0.047
+    }
+  },
+  "rl_minus_judge_held_out": {
+    "mean": 0.0031,
+    "ci95": [
+      -0.0078,
+      0.0134
+    ]
+  },
+  "states_learned": 125,
+  "learner": "search",
+  "calls": {
+    "train": 6000,
+    "held_out": 2000
+  },
+  "reward": {
+    "early": 1.0,
+    "late_step": -0.25,
+    "miss": -1.0,
+    "false_alarm": -1.5,
+    "quiet": 0.2
+  }
+}
