@@ -23,6 +23,24 @@ EXPLORER = "https://blockstream.info/api"
 RULES_FILE = Path(__file__).parent / "rules.py"
 HEADERS = {"Accept": "application/vnd.opentimestamps.v1", "User-Agent": "kavach-notary"}
 GENESIS = "0" * 64
+# a mined block's header never changes, so its hash, Merkle root and time are fetched once and kept here; every check
+# still compares the proof against that Merkle root (only the network lookup is skipped)
+BLOCKS = LEDGER / "bitcoin_blocks.json"
+
+
+def block_header(height, http, cache=True):
+    # -> {"hash", "merkle_root", "timestamp"} for a Bitcoin block, from the explorer or the local cache
+    known = json.loads(BLOCKS.read_text(encoding="utf-8")) if cache and BLOCKS.exists() else {}
+    if str(height) in known:
+        return known[str(height)]
+    block_hash = http.get(f"{EXPLORER}/block-height/{height}", timeout=20).text.strip()
+    block = http.get(f"{EXPLORER}/block/{block_hash}", timeout=20).json()
+    header = {"hash": block_hash, "merkle_root": block["merkle_root"], "timestamp": block["timestamp"]}
+    if cache:
+        known[str(height)] = header
+        BLOCKS.parent.mkdir(parents=True, exist_ok=True)
+        BLOCKS.write_text(json.dumps(known, indent=1, sort_keys=True), encoding="utf-8")
+    return header
 
 
 def canonical(obj):
@@ -113,9 +131,9 @@ def ots_status(ots_bytes, data, session=None):
     for msg, att in dtf.timestamp.all_attestations():
         if isinstance(att, BitcoinBlockHeaderAttestation):
             try:
-                block_hash = http.get(f"{EXPLORER}/block-height/{att.height}", timeout=20).text.strip()
-                block = http.get(f"{EXPLORER}/block/{block_hash}", timeout=20).json()
-            except (requests.RequestException, ValueError):
+                block = block_header(att.height, http, cache=session is None)   # tests pass their own session: no cache
+                block_hash = block["hash"]
+            except (requests.RequestException, ValueError, KeyError):
                 confirmed.append({"height": att.height, "checked": False})
                 continue
             if block["merkle_root"] != msg[::-1].hex():

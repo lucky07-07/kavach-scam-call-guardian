@@ -133,6 +133,18 @@ r0 = json.loads(rec0.read_bytes()); r0["call_id"] = "rewritten"
 rec0.write_bytes(N.canonical(r0))
 check("notary: rewriting an old record breaks the chain for every later call", not led.verify("second-call")["chain_intact"])
 
+# the block-header cache skips the network, never the check: a wrong cached Merkle root still fails the proof
+real = N.LEDGER / "records" / "00003.json"
+if real.with_suffix(".json.ots").exists():
+    ots, rec = real.with_suffix(".json.ots").read_bytes(), real.read_bytes()
+    heights = [a.height for _, a in N._dtf(ots).timestamp.all_attestations() if isinstance(a, BitcoinBlockHeaderAttestation)]
+    if heights:
+        saved, N.BLOCKS = N.BLOCKS, Path(tempfile.mkdtemp()) / "blocks.json"
+        N.BLOCKS.write_text(json.dumps({str(h): {"hash": "00", "merkle_root": "ab" * 32, "timestamp": 0} for h in heights}))
+        check("notary: a confirmed proof is still checked against the (cached) block's Merkle root",
+              N.ots_status(ots, rec)["state"] == "invalid")
+        N.BLOCKS = saved
+
 bad = [n for n, ok in checks if not ok]
 print(f"\n{len(checks) - len(bad)}/{len(checks)} passed")
 sys.exit(1 if bad else 0)
