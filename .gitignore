@@ -33,3 +33,7 @@ data/demo/trailer/rec_*/
 data/demo/trailer/*stage.html
 data/demo/trailer/*_1600.mp4
 data/demo/trailer/full/*.wav
+
+# website: media is copied in at deploy time (vercel.json)
+site/media/
+.vercel/

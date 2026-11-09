@@ -1,0 +1,1 @@
+{"evon": false, "calls": [{"id": "te_kyc_otp", "kind": "scam", "case": null, "language": "te-IN", "saved": true, "sealed": true}, {"id": "te_digital_arrest", "kind": "scam", "case": null, "language": "te-IN", "saved": true, "sealed": true}, {"id": "te_fraud_alert", "kind": "genuine", "case": null, "language": "te-IN", "saved": true, "sealed": true}], "seals": 5}

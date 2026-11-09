@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "mkdir -p site/media && cp data/demo/kavach_demo_full.mp4 data/demo/trailer/kavach_trailer.mp4 docs/Kavach_pitch.pdf site/media/",
+  "outputDirectory": "site",
+  "cleanUrls": false
+}

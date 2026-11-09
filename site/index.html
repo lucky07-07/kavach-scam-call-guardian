@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kavach — a second listener for scam calls</title>
+<meta name="description" content="Kavach catches scam calls in Telugu and Hindi, warns the listener, alerts the family and seals the evidence on Bitcoin. Built entirely on Gnani AI.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Telugu:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --soft: #f1f3f6; --line: #e6e8ec;
+  --ink: #111318; --ink-2: #4b5260; --ink-3: #8a909c;
+  --scam: #d9362b; --scam-soft: #fdeceb; --safe: #16865a; --safe-soft: #e5f5ed;
+  --brand: #4f46e5; --brand-soft: #eef0ff;
+  --shadow: 0 1px 2px rgba(17,19,24,.04), 0 8px 24px rgba(17,19,24,.06);
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0f13; --surface: #15181e; --soft: #1c2028; --line: #262b35;
+    --ink: #eceef2; --ink-2: #b4bac6; --ink-3: #7c8391;
+    --scam: #ff6b5e; --scam-soft: #2a1715; --safe: #3fcf8e; --safe-soft: #12251c;
+    --brand: #8b85ff; --brand-soft: #1d1c36;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Inter, system-ui, sans-serif; }
+a { color: var(--brand); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+.te { font-family: "Noto Sans Telugu", Inter, sans-serif; }
+
+nav { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.shield { width: 30px; height: 30px; border-radius: 9px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; }
+nav .links { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
+nav .links a { color: var(--ink-2); text-decoration: none; }
+nav .links a:hover { color: var(--ink); }
+
+.hero { padding: 56px 0 40px; }
+.eyebrow { display: inline-block; font-size: 13px; font-weight: 600; color: var(--brand); background: var(--brand-soft); padding: 4px 12px; border-radius: 999px; }
+h1 { font-size: clamp(34px, 6vw, 58px); line-height: 1.08; letter-spacing: -1.5px; margin: 18px 0 16px; max-width: 820px; }
+.lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--ink-2); max-width: 720px; margin: 0 0 28px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 15px; text-decoration: none; border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn:hover { filter: brightness(1.05); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 48px 0 0; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; box-shadow: var(--shadow); }
+.stat b { display: block; font-size: 30px; letter-spacing: -.5px; }
+.stat span { color: var(--ink-2); font-size: 14px; }
+.stat.red b { color: var(--scam); }
+
+section { padding: 56px 0; }
+h2 { font-size: clamp(26px, 3.6vw, 34px); letter-spacing: -.6px; margin: 0 0 8px; }
+.sub { color: var(--ink-2); margin: 0 0 28px; max-width: 720px; }
+
+.video { background: #000; border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+.video video { display: block; width: 100%; height: auto; }
+.vgrid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
+.vcap { font-size: 14px; color: var(--ink-3); margin-top: 8px; }
+
+.replay { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: var(--shadow); }
+.replay ul { margin: 0 0 22px; padding-left: 20px; color: var(--ink-2); }
+.replay li { margin: 4px 0; }
+.mock { background: var(--soft); border-radius: 14px; padding: 16px; display: grid; gap: 10px; font-size: 14px; }
+.bub { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; max-width: 92%; }
+.bub.hit { border-color: var(--scam); background: var(--scam-soft); }
+.bub small { display: block; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+.bub u { text-decoration-color: var(--scam); text-decoration-thickness: 2px; }
+.verdict { border-radius: 12px; padding: 10px 12px; background: var(--scam-soft); color: var(--scam); font-weight: 700; }
+
+.agents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.agent { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.agent i { font-style: normal; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 13px; }
+.agent b { display: block; margin: 10px 0 2px; }
+.agent .by { font-size: 12px; font-weight: 600; color: var(--brand); }
+.agent p { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.agent.code i { background: var(--safe-soft); color: var(--safe); }
+.agent.code .by { color: var(--safe); }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; }
+.card h3 { margin: 0 0 8px; font-size: 18px; }
+.card p, .card li { color: var(--ink-2); font-size: 15px; }
+.card ul { margin: 0; padding-left: 20px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+td { padding: 10px 0; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap; padding-right: 18px; width: 1%; }
+tr:first-child td { border-top: 0; }
+
+footer { padding: 40px 0 56px; color: var(--ink-3); font-size: 14px; border-top: 1px solid var(--line); }
+footer a { color: var(--ink-2); }
+
+@media (max-width: 860px) {
+  .vgrid, .replay, .two { grid-template-columns: 1fr; }
+  .agents { grid-template-columns: repeat(2, 1fr); }
+  .replay { padding: 20px; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  .stats { grid-template-columns: 1fr; }
+  .agents { grid-template-columns: 1fr; }
+  nav .links a.opt { display: none; }
+  .hero { padding-top: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand"><div class="shield">K</div>Kavach</div>
+    <div class="links">
+      <a href="#demo">Demo</a><a href="app/">Try it</a><a class="opt" href="#agents">How it works</a>
+      <a href="https://github.com/lucky07-07/kavach-scam-call-guardian">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <span class="eyebrow">Gnani AI · Great Indian AI Internship Challenge 2026</span>
+    <h1>A second listener for scam calls.</h1>
+    <p class="lead">Kavach catches scam calls in Telugu and Hindi, warns the listener, alerts the family and seals the evidence on Bitcoin. Built entirely on Gnani AI: Prisma, Evon and Timbre.</p>
+    <div class="cta">
+      <a class="btn primary" href="#demo">▶ Watch the demo (2:21)</a>
+      <a class="btn" href="app/">Try the replay</a>
+      <a class="btn" href="media/Kavach_pitch.pdf">1-page pitch (PDF)</a>
+    </div>
+    <div class="stats">
+      <div class="stat red"><b>₹22,845 crore</b><span>lost to cyber fraud in India in 2024 (MHA, Lok Sabha, July 2025)</span></div>
+      <div class="stat red"><b>₹62 crore a day</b><span>The typical attack is a phone call asking for an OTP</span></div>
+      <div class="stat"><b>8 agents</b><span>The LLM argues both sides. Code decides.</span></div>
+    </div>
+  </header>
+
+  <section id="demo">
+    <h2>See it work</h2>
+    <p class="sub">The full demo is one real run of the app, narrated: a Telugu scam call, the verdict, the warning, the family alert, the 1930 complaint, the seal, a genuine call left alone, and the family asking.</p>
+    <div class="vgrid">
+      <div>
+        <div class="video"><video controls preload="metadata" playsinline poster="poster_demo.jpg" src="media/kavach_demo_full.mp4"></video></div>
+        <div class="vcap">Full demo · 2:21</div>
+      </div>
+      <div>
+        <div class="video"><video controls preload="metadata" playsinline poster="poster_trailer.jpg" src="media/kavach_trailer.mp4"></video></div>
+        <div class="vcap">Trailer · 0:60</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="replay">
+      <div>
+        <h2>Try the real screen</h2>
+        <p class="sub" style="margin-bottom:16px">This is Kavach's own screen, replaying three saved Telugu calls that it analysed with Gnani Prisma, Evon and Timbre. Press Analyse and the call plays, with English subtitles:</p>
+        <ul>
+          <li>the caller's words that prove the scam, underlined</li>
+          <li>what the Prosecutor, Defender and Judge each decided</li>
+          <li>the Telugu warning and the family's voice note</li>
+          <li>the 1930 complaint, and the seal checked against Bitcoin</li>
+          <li>a genuine bank call, left alone</li>
+        </ul>
+        <a class="btn primary" href="app/">Open the replay →</a>
+        <p class="vcap">Live analysis needs our Gnani key and Evon on a GPU, so it runs on our machine, not here.</p>
+      </div>
+      <div class="mock" aria-hidden="true">
+        <div class="bub hit"><small>Caller</small><span class="te">నేను SBI head office నుంచి మాట్లాడుతున్నాను మీ <u>KYC</u> <u>expire</u> అయింది ఈరోజు update చేయకపోతే మీ account <u>block</u> అవుతుంది</span></div>
+        <div class="bub" style="justify-self:end"><small>Listener</small><span class="te">అవునా ఏం చేయాలి</span></div>
+        <div class="bub hit"><small>Caller</small><span class="te">ఇప్పుడు మీ phone కి ఒక <u>OTP</u> వస్తుంది అది నాకు చెప్పండి</span></div>
+        <div class="verdict">Scam · asks for OTP / PIN · cut-off threat</div>
+        <div class="bub"><small>Spoken to the listener · Timbre</small><span class="te">జాగ్రత్త, ఇది మోసం కాల్. OTP లేదా PIN అడిగితే… వెంటనే ఫోన్ పెట్టేయండి.</span></div>
+        <div class="bub"><small>Family alerted · voice note</small>Urgent: Amma just got a scam call. The caller asked for her OTP or PIN… Call her now.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="agents">
+    <h2>Eight agents, one job</h2>
+    <p class="sub">During the call, agents 1–7 run in a fixed order. Evon argues; the verdict is decided by code, never by the LLM.</p>
+    <div class="agents">
+      <div class="agent"><i>1</i><b>Listener</b><span class="by">Gnani Prisma</span><p>Transcribes the call and separates the caller from the listener.</p></div>
+      <div class="agent"><i>2</i><b>Prosecutor</b><span class="by">Gnani Evon</span><p>Lists the scam tactics, quoting the caller.</p></div>
+      <div class="agent"><i>3</i><b>Defender</b><span class="by">Gnani Evon</span><p>Lists signs the call is genuine.</p></div>
+      <div class="agent code"><i>4</i><b>Judge</b><span class="by">Code</span><p>Counts a claim only if the caller's own words prove it, and it isn't negated.</p></div>
+      <div class="agent"><i>5</i><b>Guardian</b><span class="by">Evon + Timbre</span><p>Warns the listener in Telugu or Hindi, and alerts the family with a voice note.</p></div>
+      <div class="agent"><i>6</i><b>Reporter</b><span class="by">Gnani Evon</span><p>Drafts the complaint for the 1930 cybercrime helpline.</p></div>
+      <div class="agent code"><i>7</i><b>Notary</b><span class="by">SHA-256 · Bitcoin</span><p>Seals the evidence in a hash chain, timestamped with OpenTimestamps.</p></div>
+      <div class="agent"><i>8</i><b>Family assistant</b><span class="by">Evon over MCP</span><p>After the call, answers the family's questions from the sealed evidence.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="two">
+      <div class="card">
+        <h3>Why it can be trusted</h3>
+        <ul>
+          <li><b>The LLM argues; code decides.</b> An LLM judge flagged every genuine call. With the prosecutor/defender split and a code Judge, no genuine test call has been flagged since.</li>
+          <li><b>The caller's words never reach the listener.</b> Warnings and alerts are built only from verified tactics.</li>
+          <li><b>Only a 32-byte hash leaves the device.</b> A one-byte edit fails verification against the Bitcoin block.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Results so far (synthetic calls)</h3>
+        <table>
+          <tr><td>22/22</td><td>Genuine Telugu–English calls left alone</td></tr>
+          <tr><td>16/22</td><td>Scams caught on the same set</td></tr>
+          <tr><td>3/3</td><td>Telugu calls right end to end with real Evon</td></tr>
+          <tr><td>9–12 s</td><td>Time to a Telugu verdict</td></tr>
+          <tr><td>120</td><td>Automated tests passing</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>100% Gnani, sovereign AI</h3>
+        <table>
+          <tr><td>Prisma v2.5</td><td>Speech-to-text in Telugu, Hindi, English and code-mixed speech; separates caller and listener</td></tr>
+          <tr><td>Evon v3.3</td><td>Open-weight LLM, self-hosted</td></tr>
+          <tr><td>Timbre</td><td>Speaks the warning and the family's voice note, in Telugu and Hindi</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Limits and next steps</h3>
+        <ul>
+          <li>Calls are analysed after recording. Next: streaming Prisma, for warnings during the call.</li>
+          <li>Family alerts are built, voiced and queued; no SMS/WhatsApp gateway is connected yet.</li>
+          <li>All test calls are synthetic. Next: more Indian languages and a pilot with real families.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Kavach · built by Anil Kumar and Dheeraj Tadi for the Gnani AI Great Indian AI Internship Challenge 2026 ·
+    <a href="https://github.com/lucky07-07/kavach-scam-call-guardian">Code on GitHub</a> ·
+    <a href="media/Kavach_pitch.pdf">Pitch (PDF)</a>
+  </footer>
+</div>
+</body>
+</html>
