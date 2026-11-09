@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kavach/transcript/v1",
+  "title": "Kavach transcript (Listener output, v1)",
+  "description": "What the Listener hands to every downstream agent. Turns are in time order; each turn is one speaker's consecutive speech.",
+  "type": "object",
+  "required": ["schema", "call_id", "source", "language", "audio_sha256", "speaker_assignment", "turns", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "kavach.transcript.v1"},
+    "call_id": {"type": "string", "minLength": 1},
+    "source": {
+      "description": "prisma-batch-diarized: one mono file, Prisma separates the speakers. prisma-batch-stereo: caller and listener on separate channels, each transcribed alone. text: a typed or dataset transcript, no audio.",
+      "enum": ["prisma-batch-diarized", "prisma-batch-stereo", "text"]
+    },
+    "language": {"type": "string", "description": "Prisma language code, e.g. te-IN, en-IN"},
+    "audio_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the audio file as received; null for text. The Notary seals this."},
+    "duration_s": {"type": ["number", "null"], "minimum": 0},
+    "speaker_assignment": {
+      "description": "How the caller was identified. most_words is a guess (whoever talks more is the caller); the screen lets the family swap it, which records manual.",
+      "enum": ["most_words", "stereo_channel", "manual", "text_labels"]
+    },
+    "turns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["speaker", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "speaker": {"enum": ["caller", "listener"]},
+          "text": {"type": "string", "minLength": 1},
+          "start": {"type": ["number", "null"], "minimum": 0},
+          "end": {"type": ["number", "null"], "minimum": 0},
+          "raw_speaker": {"type": ["string", "null"], "description": "Prisma's speaker_id or the channel name, kept for audit"},
+          "prisma_text": {"type": ["string", "null"], "description": "Prisma batch text, when the per-turn pass or loanword latinising changed it"}
+        }
+      }
+    },
+    "prisma": {
+      "type": ["object", "null"],
+      "description": "Provenance for the evidence packet: job and file ids, model, request settings.",
+      "additionalProperties": true
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}, "description": "Anything downstream agents should know, e.g. more than two speakers were found"},
+    "created_at": {"type": "string", "description": "UTC, ISO 8601"}
+  }
+}

@@ -1,0 +1,28 @@
+# secrets
+*.env
+
+# local environments and caches
+.venv/
+__pycache__/
+.claude/
+
+# ICFD-31k: research/defensive-use licence, not redistributed (download it yourself)
+data/icfd31k/
+data/runs/SCENARIO_*/
+data/ledger/packets/SCENARIO_*
+
+# generated audio, TTS cache and recording scratch
+data/test_audio/
+data/tts_cache/
+data/demo/rec/
+data/demo/frames/
+data/demo/trailer/rec/
+data/demo/trailer/frames/
+data/demo/trailer/*.wav
+data/demo/trailer/stage.html
+
+# early ideation and design scratch, Kaggle push copies
+multi_agent_ideation/
+ui-mockups/
+docs/Gnani_Challenge_Research_Dossier.*
+evon/kaggle_push*/
