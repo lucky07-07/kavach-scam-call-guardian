@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kavach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Telugu:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --soft: #f1f3f6; --line: #e6e8ec;
+  --ink: #111318; --ink-2: #4b5260; --ink-3: #8a909c;
+  --scam: #d9362b; --scam-soft: #fdeceb; --warn: #c27803; --warn-soft: #fff5e1; --safe: #16865a; --safe-soft: #e5f5ed;
+  --brand: #4f46e5; --brand-soft: #eef0ff;
+  --shadow: 0 1px 2px rgba(17,19,24,.04), 0 8px 24px rgba(17,19,24,.06);
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f13; --surface: #15181e; --soft: #1c2028; --line: #262b35;
+    --ink: #eceef2; --ink-2: #b3b9c5; --ink-3: #7d8493;
+    --scam: #ff7a6e; --scam-soft: #34191a; --warn: #f3b13f; --warn-soft: #33270f; --safe: #4fd08f; --safe-soft: #12291d;
+    --brand: #8b85ff; --brand-soft: #1e1d3a; --shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f13; --surface: #15181e; --soft: #1c2028; --line: #262b35;
+  --ink: #eceef2; --ink-2: #b3b9c5; --ink-3: #7d8493;
+  --scam: #ff7a6e; --scam-soft: #34191a; --warn: #f3b13f; --warn-soft: #33270f; --safe: #4fd08f; --safe-soft: #12291d;
+  --brand: #8b85ff; --brand-soft: #1e1d3a; --shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 Inter, system-ui, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+.te { font-family: "Noto Sans Telugu", Inter, sans-serif; }
+.mono { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+header { display: flex; align-items: center; gap: 12px; max-width: 1180px; margin: 0 auto; padding: 22px 24px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; letter-spacing: -.2px; }
+.shield { width: 30px; height: 30px; border-radius: 9px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 15px; }
+.sub { color: var(--ink-3); font-size: 13.5px; margin-left: 4px; }
+.right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.status { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.status.on i { background: var(--safe); box-shadow: 0 0 0 4px var(--safe-soft); }
+.status.off i { background: var(--warn); }
+.ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 6px 10px; color: var(--ink-2); }
+.views { display: flex; gap: 4px; background: var(--soft); border-radius: 12px; padding: 4px; }
+.views button { border: 0; background: transparent; padding: 6px 12px; border-radius: 9px; font-weight: 600; font-size: 13px; color: var(--ink-2); }
+.views button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; }
+.bar select { border: 0; background: var(--soft); border-radius: 10px; padding: 9px 12px; min-width: 260px; font-weight: 500; }
+.bar audio { height: 38px; flex: 1; min-width: 220px; }
+.toggle { display: inline-flex; background: var(--soft); border-radius: 10px; padding: 3px; }
+.toggle button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.go { border: 0; background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 11px; font-weight: 600; }
+.go:disabled { opacity: .45; cursor: progress; }
+.note { color: var(--ink-3); font-size: 13px; }
+.err { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--warn-soft); color: var(--ink); font-size: 13.5px; }
+
+/* pipeline strip */
+.flow { display: flex; align-items: center; gap: 6px; margin: 22px 2px 6px; overflow-x: auto; padding-bottom: 4px; }
+.step { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 7px 10px 7px 8px; border-radius: 999px; color: var(--ink-3); font-size: 13px; font-weight: 600; white-space: nowrap; transition: background .25s, color .25s; }
+.step i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; background: var(--soft); color: var(--ink-3); transition: background .25s, color .25s; }
+.step small { font-weight: 500; color: var(--ink-3); }
+.step[data-s="work"] i { background: var(--brand-soft); color: var(--brand); animation: pulse 1s infinite; }
+.step[data-s="done"] { color: var(--ink); } .step[data-s="done"] i { background: var(--ink); color: var(--bg); }
+.step[data-s="alert"] { color: var(--scam); } .step[data-s="alert"] i { background: var(--scam); color: #fff; }
+.step[data-s="ok"] { color: var(--safe); } .step[data-s="ok"] i { background: var(--safe); color: #fff; }
+.step[aria-expanded="true"] { background: var(--surface); box-shadow: var(--shadow); }
+.sep { flex: none; width: 14px; height: 1px; background: var(--line); }
+@keyframes pulse { 50% { opacity: .45; } }
+.detail { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 14px 18px; font-size: 14px; color: var(--ink-2); margin-bottom: 6px; animation: rise .2s ease; }
+.detail h4 { margin: 0 0 6px; font-size: 13px; color: var(--ink); }
+.detail ul { margin: 4px 0 0; padding-left: 18px; } .detail li { margin: 2px 0; }
+.detail .kept { color: var(--scam); font-weight: 600; } .detail .dropped { color: var(--ink-3); text-decoration: line-through; }
+.detail .why { color: var(--ink-3); font-size: 12.5px; }
+
+/* main layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 22px; margin-top: 16px; align-items: start; }
+.panel { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); }
+.panel-h { display: flex; align-items: center; gap: 8px; padding: 14px 18px 0; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.panel-h span { margin-left: auto; font-weight: 500; }
+.chat { display: flex; flex-direction: column; gap: 10px; padding: 14px 18px 18px; max-height: 640px; overflow: auto; }
+.msg { max-width: 82%; animation: rise .3s ease; }
+.msg .who { font-size: 11.5px; color: var(--ink-3); margin: 0 4px 3px; }
+.msg .b { padding: 10px 13px; border-radius: 14px; background: var(--soft); }
+.msg.caller { align-self: flex-start; } .msg.caller .b { border-top-left-radius: 4px; }
+.msg.listener { align-self: flex-end; text-align: right; } .msg.listener .b { background: var(--brand-soft); border-top-right-radius: 4px; text-align: left; }
+.msg.hit .b { box-shadow: inset 3px 0 0 var(--scam); }
+.msg u { text-decoration: none; background: linear-gradient(transparent 62%, var(--scam-soft) 62%); color: var(--scam); font-weight: 600; }
+.msg .tags { display: flex; gap: 5px; flex-wrap: wrap; margin: 6px 4px 0; }
+.msg .tags span { font-size: 11.5px; color: var(--scam); font-weight: 600; }
+.placeholder { color: var(--ink-3); padding: 34px 18px; text-align: center; font-size: 14px; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.side { display: flex; flex-direction: column; gap: 16px; }
+.verdict { padding: 22px; border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+.verdict .k { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.verdict .v { font-size: 40px; font-weight: 700; letter-spacing: -.8px; line-height: 1.1; margin: 2px 0 8px; color: var(--ink-3); }
+.verdict p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.verdict .found { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.verdict .found span { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--soft); color: var(--ink-2); }
+.verdict.SCAM { background: var(--scam-soft); } .verdict.SCAM .v { color: var(--scam); } .verdict.SCAM .found span { background: var(--surface); color: var(--scam); }
+.verdict.SUSPICIOUS { background: var(--warn-soft); } .verdict.SUSPICIOUS .v { color: var(--warn); } .verdict.SUSPICIOUS .found span { background: var(--surface); color: var(--warn); }
+.verdict.SAFE { background: var(--safe-soft); } .verdict.SAFE .v { color: var(--safe); }
+.verdict .by { margin-top: 12px; font-size: 12px; color: var(--ink-3); }
+
+.card { padding: 16px 18px; border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+.card .k { font-size: 12.5px; color: var(--ink-3); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.say { font-size: 18px; line-height: 1.7; margin: 8px 0 4px; font-weight: 500; }
+.play { margin-left: auto; border: 0; background: var(--ink); color: var(--bg); width: 34px; height: 34px; border-radius: 50%; font-size: 13px; }
+.small { font-size: 12.5px; color: var(--ink-3); }
+.seal-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.badge { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+.badge.ok { background: var(--safe-soft); color: var(--safe); } .badge.pend { background: var(--warn-soft); color: var(--warn); } .badge.no { background: var(--scam-soft); color: var(--scam); }
+.fp { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: var(--soft); word-break: break-all; color: var(--ink-2); }
+.links { display: flex; gap: 14px; margin-top: 12px; }
+.links button { border: 0; background: transparent; padding: 0; font-size: 13px; font-weight: 600; color: var(--brand); }
+.vres { margin-top: 10px; display: grid; gap: 6px; }
+.vres div { padding: 8px 12px; border-radius: 10px; font-size: 13px; animation: rise .2s ease; }
+.vres .ok { background: var(--safe-soft); color: var(--safe); } .vres .no { background: var(--scam-soft); color: var(--scam); }
+details.card summary { cursor: pointer; list-style: none; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary::after { content: "+"; float: right; }
+details.card[open] summary::after { content: "–"; }
+.report { white-space: pre-wrap; font-size: 13.5px; color: var(--ink-2); margin-top: 10px; }
+
+/* assistant */
+.assist { max-width: 760px; margin: 22px auto 0; }
+.assist .lead { color: var(--ink-2); font-size: 14px; margin: 0 4px 14px; }
+.thread { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.thread .q { align-self: flex-end; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 14px 14px 4px 14px; max-width: 80%; animation: rise .25s ease; }
+.thread .a { align-self: flex-start; background: var(--surface); box-shadow: var(--shadow); padding: 12px 15px; border-radius: 14px 14px 14px 4px; max-width: 88%; animation: rise .25s ease; }
+.thread .tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.thread .tools span { font-size: 11.5px; font-weight: 600; color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: 999px; }
+.ask { display: flex; gap: 8px; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 6px; }
+.ask input { flex: 1; border: 0; background: transparent; padding: 10px 12px; outline: none; font-family: "Noto Sans Telugu", Inter, sans-serif; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.chips button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--ink-2); font-family: "Noto Sans Telugu", Inter, sans-serif; }
+.hidden { display: none !important; }
+.caption { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); max-width: 880px; width: calc(100% - 48px);
+  background: rgba(17,19,24,.88); color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 17px; line-height: 1.45;
+  text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.25); animation: fade .25s ease; z-index: 20; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.caption small { display: block; font-size: 12px; opacity: .65; margin-bottom: 2px; letter-spacing: .3px; }
+
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  .sub { display: none; } .bar select { min-width: 0; width: 100%; } .msg { max-width: 92%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="shield">K</div>Kavach</div>
+  <div class="sub">second listener for scam calls</div>
+  <div class="right">
+    <div class="views">
+      <button id="tCall" aria-selected="true">Call</button>
+      <button id="tAssist" aria-selected="false">Ask Kavach</button>
+    </div>
+    <div class="status" id="status"><i></i><span>Evon</span></div>
+    <button class="ghost" id="theme" aria-label="Light or dark">◐</button>
+  </div>
+</header>
+
+<main>
+  <section id="viewCall">
+    <div class="bar">
+      <select id="call" aria-label="Call"></select>
+      <audio id="player" controls preload="none"></audio>
+      <div class="toggle"><button id="mLive" aria-pressed="true">Live</button><button id="mReplay" aria-pressed="false">Replay</button></div>
+      <button class="go" id="go">Analyse</button>
+    </div>
+    <div class="err hidden" id="err"></div>
+
+    <nav class="flow" id="flow"></nav>
+    <div id="detail"></div>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="panel-h">Conversation <span id="src"></span></div>
+        <div class="chat" id="chat"><div class="placeholder">Choose a call and press Analyse.</div></div>
+      </div>
+      <div class="side">
+        <div class="verdict" id="verdict"><div class="k">Verdict</div><div class="v">—</div><p>Waiting for a call.</p></div>
+        <div id="warning"></div>
+        <div class="card hidden" id="sealCard"></div>
+        <details class="card hidden" id="reportCard"><summary>Complaint for 1930 / cybercrime.gov.in</summary><div class="report" id="report"></div></details>
+        <div class="small" id="timing"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="viewAssist" class="assist hidden">
+    <p class="lead">Ask about a call in any language. Kavach's assistant reads the sealed evidence through its MCP tools. It can explain and verify, never change a verdict.</p>
+    <div class="thread" id="thread"></div>
+    <div class="ask"><input id="q" placeholder="Ask about a call…"><button class="go" id="askBtn">Ask</button></div>
+    <div class="chips" id="chips">
+      <button>అమ్మకి వచ్చిన చివరి call ఏంటి? సాక్ష్యం సరిగ్గా ఉందా?</button>
+      <button>Was the evidence changed after the call?</button>
+      <button>1930 కి complaint ఎలా పెట్టాలి?</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const TACTICS = {
+  money_or_fee_request: "Asks for money", otp_pin_password_request: "Asks for OTP / PIN",
+  card_or_bank_details_request: "Asks for bank details", remote_access_app: "Remote-access app",
+  arrest_or_legal_threat: "Arrest threat", account_or_service_threat: "Cut-off threat",
+  secrecy_demand: "Demands secrecy", impersonation_with_pressure: "Poses as an official", suspicious_link: "Sends a link",
+};
+const STEPS = [
+  ["listener", "Listen", "Prisma"], ["prosecutor", "Prosecute", "Evon"], ["defender", "Defend", "Evon"],
+  ["judge", "Judge", "code"], ["guardian", "Warn", "Timbre"], ["reporter", "Report", "Evon"], ["notary", "Seal", "Bitcoin"],
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let mode = "live", current = null, details = {}, open = null;
+
+try { const t = localStorage.getItem("kavach-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("theme").onclick = () => {
+  const dark = document.documentElement.dataset.theme === "dark" ||
+    (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("kavach-theme", document.documentElement.dataset.theme); } catch (e) {}
+};
+const err = m => { $("err").textContent = m || ""; $("err").classList.toggle("hidden", !m); };
+
+function flow(states = {}) {
+  $("flow").innerHTML = STEPS.map(([id, name, by], i) =>
+    `${i ? '<span class="sep"></span>' : ""}<button class="step" data-id="${id}" data-s="${states[id] || "idle"}" aria-expanded="${open === id}">
+       <i>${i + 1}</i>${name}<small>${by}</small></button>`).join("");
+  document.querySelectorAll(".step").forEach(b => b.onclick = () => { open = open === b.dataset.id ? null : b.dataset.id; flow(states); detail(); });
+}
+function detail() {
+  $("detail").innerHTML = open && details[open] ? `<div class="detail">${details[open]}</div>` : "";
+}
+
+async function status() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    $("status").className = "status " + (s.evon ? "on" : "off");
+    $("status").querySelector("span").textContent = s.evon ? "Evon online" : "Evon offline";
+    if (!$("call").options.length) {
+      $("call").innerHTML = s.calls.map(c => `<option value="${c.id}">${({"te-IN": "Telugu", "hi-IN": "Hindi"})[c.language] || "English"} · ${c.kind === "scam" ? "Scam" : "Genuine"} · ${c.id.replace(/^SCENARIO_\d+_/, "").replace(/_r\d+$/, "").replace(/^te_|_hi$/g, "").replace(/_/g, " ")}${c.saved ? " · saved" : ""}</option>`).join("");
+      pick();
+    }
+  } catch (e) { err("Cannot reach the Kavach server."); }
+}
+function pick() { current = $("call").value; $("player").src = `/api/audio/${current}`; }
+$("call").onchange = pick;
+function setMode(m) { mode = m; $("mLive").setAttribute("aria-pressed", m === "live"); $("mReplay").setAttribute("aria-pressed", m === "replay"); }
+$("mLive").onclick = () => setMode("live"); $("mReplay").onclick = () => setMode("replay");
+function view(v) {
+  $("tCall").setAttribute("aria-selected", v === "call"); $("tAssist").setAttribute("aria-selected", v === "assist");
+  $("viewCall").classList.toggle("hidden", v !== "call"); $("viewAssist").classList.toggle("hidden", v !== "assist");
+}
+$("tCall").onclick = () => view("call"); $("tAssist").onclick = () => view("assist");
+
+function marked(text, marks) {
+  let out = "", i = 0;
+  for (const m of marks) { out += esc(text.slice(i, m.start)) + `<u title="${esc(TACTICS[m.tactic])}">${esc(text.slice(m.start, m.end))}</u>`; i = m.end; }
+  return out + esc(text.slice(i));
+}
+
+function reset() {
+  err(""); details = {}; open = null; detail();
+  $("chat").innerHTML = '<div class="placeholder">Listening…</div>';
+  $("verdict").className = "verdict"; $("verdict").innerHTML = '<div class="k">Verdict</div><div class="v">…</div><p>Thinking.</p>';
+  $("warning").innerHTML = ""; $("sealCard").classList.add("hidden"); $("reportCard").classList.add("hidden"); $("timing").textContent = "";
+}
+
+async function analyse() {
+  if (!current) return;
+  reset();
+  $("go").disabled = true;
+  flow(Object.fromEntries(STEPS.map(([id]) => [id, "work"])));
+  let r;
+  try {
+    const res = await fetch("/api/analyse", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({call_id: current, mode})});
+    r = await res.json();
+    if (!res.ok) throw new Error(r.detail || res.statusText);
+  } catch (e) {
+    err(String(e.message || e)); flow(); $("go").disabled = false;
+    $("chat").innerHTML = '<div class="placeholder">Choose a call and press Analyse.</div>';
+    $("verdict").innerHTML = '<div class="k">Verdict</div><div class="v">—</div><p>Waiting for a call.</p>'; return;
+  }
+  await reveal(r);
+  $("go").disabled = false; status();
+}
+
+// ---- demo mode (used by kavach/make_demo_video.py): the transcript appears in time with the call audio, with English
+// subtitles; the page itself plays no sound, the recorder lays the call and warning audio under the video ----
+let demo = null;
+function caption(text, label) {
+  document.querySelectorAll(".caption").forEach(c => c.remove());
+  if (text) document.body.insertAdjacentHTML("beforeend", `<div class="caption">${label ? `<small>${esc(label)}</small>` : ""}${esc(text)}</div>`);
+}
+window.kavachDemo = async (callId, opts = {}) => {
+  view("call"); setMode("replay");
+  $("call").value = callId; pick();
+  reset(); flow(Object.fromEntries(STEPS.map(([id]) => [id, "work"])));
+  const r = await (await fetch("/api/analyse", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({call_id: callId, mode: "replay"})})).json();
+  demo = {t0: performance.now(), gloss: opts.gloss || []};
+  await reveal(r);
+  const warnAt = (performance.now() - demo.t0) / 1000;
+  if (r.warning.text && opts.warningGloss) caption(opts.warningGloss, "Kavach to the listener, in Telugu");
+  demo = null;
+  return {warnAt, verdict: r.verdict};
+};
+window.kavachCaption = caption;
+window.kavachVerify = verify;
+window.kavachAsk = ask;
+window.kavachView = view;
+
+async function reveal(r) {
+  const L = r.listener || {};
+  $("src").textContent = L.source === "text" ? "typed" : `Prisma · ${L.speaker_assignment === "stereo_channel" ? "stereo" : "speakers separated"}`;
+  $("chat").innerHTML = "";
+  for (const [i, t] of r.turns.entries()) {
+    if (demo) {   // wait for the moment this turn is spoken in the recording
+      const due = demo.t0 + (t.start || 0) * 1000 - performance.now();
+      if (due > 0) await sleep(due);
+      caption(demo.gloss[i] || "", t.speaker === "caller" ? "Caller" : "Listener");
+    }
+    const tags = [...new Set(t.evidence.map(e => TACTICS[e.tactic] + (e.source === "red_line" ? " (rule)" : "")))];
+    $("chat").insertAdjacentHTML("beforeend", `<div class="msg ${t.speaker}${t.evidence.length ? " hit" : ""}">
+      <div class="who">${t.speaker === "caller" ? "Caller" : "Listener"}</div><div class="b">${marked(t.text, t.marks)}</div>
+      ${tags.length ? `<div class="tags">${tags.map(x => `<span>● ${esc(x)}</span>`).join("")}</div>` : ""}</div>`);
+    $("chat").scrollTop = $("chat").scrollHeight;
+    await sleep(120);
+  }
+  if (demo) {   // let the last turn finish being spoken before the agents report
+    const last = r.turns[r.turns.length - 1];
+    const due = demo.t0 + ((last.end || last.start || 0) + 0.6) * 1000 - performance.now();
+    if (due > 0) await sleep(due);
+    caption("");
+  }
+  const kept = r.claims.filter(c => c.check === "ok"), dropped = r.claims.filter(c => c.check !== "ok");
+  const flagged = r.verdict !== "SAFE";
+  details = {
+    listener: `<h4>Listen · Prisma</h4>${r.turns.length} turns${L.duration_s ? `, ${Math.round(L.duration_s)} s` : ""}. Caller identified by ${({most_words: "who talks more", stereo_channel: "stereo channel", manual: "the family", text_labels: "labels"})[L.speaker_assignment] || "—"}.${(L.warnings || []).map(w => `<div class="why">${esc(w)}</div>`).join("")}`,
+    prosecutor: `<h4>Prosecute · Evon</h4>${r.claims.length ? `<ul>${r.claims.map(c => `<li class="${c.check === "ok" ? "kept" : "dropped"}">${TACTICS[c.tactic]} <span class="why">“${esc(c.quote.slice(0, 90))}”</span></li>`).join("")}</ul>` : "Claimed nothing."}`,
+    defender: `<h4>Defend · Evon</h4>${r.benign.length ? `<ul>${r.benign.map(b => `<li>${esc(b.signal)}</li>`).join("")}</ul>` : "Found no genuine-call signals."}`,
+    judge: `<h4>Judge · code</h4>Kept ${kept.length} claim${kept.length === 1 ? "" : "s"} the transcript proves, rejected ${dropped.length}.${dropped.length ? `<ul>${dropped.map(c => `<li class="dropped">${TACTICS[c.tactic]}</li> <span class="why">${esc(c.check)}</span>`).join("")}</ul>` : ""}${r.evidence.some(e => e.source === "red_line") ? '<div class="why">A red-line rule in code also fired, independent of Evon.</div>' : ""}`,
+    guardian: `<h4>Warn · Evon + Timbre</h4>${r.warning.text ? (r.warning.source === "evon" ? "Evon's warning passed every check (Telugu, no caller words, no numbers or links)." : `Used the approved warning${r.warning.rejected.length ? ` because Evon's text ${esc(r.warning.rejected.join(", "))}` : ""}.`) : "Stayed silent: nothing to warn about."}`,
+    reporter: `<h4>Report · Evon</h4>${r.report ? "Drafted the complaint (below the seal)." : "Not needed."}`,
+    notary: `<h4>Seal · Bitcoin</h4>${r.seal ? `Sealed as #${r.seal.index}, linked to the previous seal, stamped via OpenTimestamps.` : "Safe calls are not sealed."}`,
+  };
+  const st = {};
+  for (const [id] of STEPS) {
+    st[id] = id === "prosecutor" ? (kept.length ? "alert" : "ok") : id === "judge" ? (flagged ? "alert" : "ok") : (!flagged && ["guardian", "reporter", "notary"].includes(id) ? "ok" : "done");
+    flow({...Object.fromEntries(STEPS.map(([s]) => [s, "work"])), ...st});
+    await sleep(220);
+  }
+  const found = [...new Set(r.tactics)].map(t => `<span>${TACTICS[t]}</span>`).join("");
+  $("verdict").className = `verdict ${r.verdict}`;
+  $("verdict").innerHTML = `<div class="k">Verdict</div><div class="v">${r.verdict === "SUSPICIOUS" ? "Suspicious" : r.verdict === "SCAM" ? "Scam" : "Safe"}</div>
+    <p>${esc(r.reason)}</p>${found ? `<div class="found">${found}</div>` : ""}
+    <div class="by">Decided by code from what the caller actually said${r.verdict_without_red_lines && r.verdict_without_red_lines !== r.verdict ? " · a red-line rule caught what Evon missed" : ""}</div>`;
+  if (r.warning.text) {
+    $("warning").innerHTML = `<div class="card"><div class="k">Spoken to the listener<button class="play" id="playW" aria-label="Play">▶</button></div>
+      <div class="say te">${esc(r.warning.text)}</div><div class="small">Timbre · ${r.warning.lang === "hi" ? "Hindi" : "Telugu"}</div></div>`;
+    const a = new Audio(`/api/warning/${r.call_id}?t=${Date.now()}`);
+    $("playW").onclick = () => { a.currentTime = 0; a.play(); };
+    if (r.has_warning_audio && !demo) a.play().catch(() => {});
+  }
+  seal(r.seal, r.call_id);
+  if (r.report) { $("report").textContent = r.report; $("reportCard").classList.remove("hidden"); }
+  const tm = r.timings || {};
+  if (tm.verdict_s != null) $("timing").textContent = `Verdict in ${tm.verdict_s} s · warning ready at ${tm.warning_s} s`;
+}
+
+function seal(s, callId) {
+  const c = $("sealCard");
+  if (!s) { c.classList.add("hidden"); return; }
+  const st = s.stamp.state === "confirmed" ? `<span class="badge ok">On Bitcoin · block ${s.stamp.bitcoin.height}</span>`
+           : s.stamp.state === "pending" ? '<span class="badge pend">Bitcoin stamp pending</span>' : `<span class="badge no">${esc(s.stamp.state)}</span>`;
+  c.innerHTML = `<div class="k">Evidence sealed</div>
+    <div class="seal-row">${st}<span class="small">#${s.index} · ${esc(s.sealed_at.slice(0, 16).replace("T", " "))} UTC</span></div>
+    <div class="fp mono">${s.packet_sha256}</div>
+    <div class="links"><button id="vO">Verify original</button><button id="vE">Try an edited copy</button></div>
+    <div class="vres" id="vres"></div>`;
+  c.classList.remove("hidden");
+  $("vO").onclick = () => verify(callId, false); $("vE").onclick = () => verify(callId, true);
+}
+async function verify(callId, edited) {
+  const r = await (await fetch("/api/verify", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({call_id: callId, edited})})).json();
+  const ok = r.packet_matches_seal && r.chain_intact;
+  $("vres").insertAdjacentHTML("afterbegin", `<div class="${ok ? "ok" : "no"}">${edited ? "Edited copy (1 byte of the verdict changed)" : "Original evidence"}: ${ok ? "✓ matches the seal" : "✗ does not match the seal"}</div>`);
+}
+
+async function ask(text) {
+  const q = (text ?? $("q").value).trim();
+  if (!q) return $("q").focus();
+  $("q").value = "";
+  $("thread").insertAdjacentHTML("beforeend", `<div class="q te">${esc(q)}</div>`);
+  const a = document.createElement("div"); a.className = "a"; a.innerHTML = '<span class="small">Reading the sealed evidence…</span>';
+  $("thread").appendChild(a); $("askBtn").disabled = true;
+  try {
+    const res = await fetch("/api/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q})});
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.detail || res.statusText);
+    const names = {list_incidents: "listed calls", get_incident: "read the evidence", verify_seal: "verified the seal", draft_complaint: "fetched the complaint"};
+    a.innerHTML = `<div class="te">${esc(r.answer)}</div><div class="tools">${r.steps.map(s => `<span>${names[s.tool] || s.tool}</span>`).join("")}<span style="background:var(--soft);color:var(--ink-3)">${r.source === "fixed" ? "fixed Telugu answer from the evidence" : "written by Evon"}</span></div>`;
+  } catch (e) { a.textContent = String(e.message || e); }
+  $("askBtn").disabled = false;
+}
+$("askBtn").onclick = () => ask();
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+document.querySelectorAll("#chips button").forEach(b => b.onclick = () => ask(b.textContent));
+
+$("go").onclick = analyse;
+flow(); status(); setInterval(status, 30000);
+</script>
+</body>
+</html>
