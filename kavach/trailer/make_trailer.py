@@ -1,5 +1,6 @@
 # Launch-style trailer for Kavach (60 s): kinetic typography, real screen footage cropped into a window, an animated pipeline,
-# Timbre narration, the real Telugu and Hindi warnings, synthesised SFX and a music bed, cut to the narration.
+# Timbre narration, the real Telugu and Hindi warnings, a recap montage, synthesised SFX and a 100 BPM bed; every cut
+# lands on the beat, with a silence-then-drop at the reveal and a flash + hit on the big moments.
 #   data/demo/trailer/kavach_trailer.mp4  (1920x1080)
 # Needs: narration.py run first; data/demo/kavach_demo.mp4 (the screen recording) for footage.
 # Usage: .venv\Scripts\python -m kavach.trailer.make_trailer
@@ -19,22 +20,37 @@ TE_WARN, HI_WARN = ROOT / "data" / "runs" / "te_kyc_otp" / "warning.wav", DEMO /
 SEAL_HASH = json.loads((ROOT / "data" / "ledger" / "records" / "00000.json").read_bytes())["packet_sha256"]
 
 
-# ---------------------------------------------------------------- timeline: scene lengths follow the narration
+# ---------------------------------------------------------------- timeline: narration-led, every cut snapped to the beat
+BPM = 100
+BEAT = 60 / BPM
+MONTAGE = [  # rapid recap shots: (word, demo time, crop x, y, w, h in source pixels, scale)
+    ("Hears.", 18.0, 220, 220, 660, 220, 1.9), ("Judges.", 34.0, 890, 215, 490, 350, 1.8),
+    ("Warns.", 34.0, 890, 580, 490, 170, 2.0), ("Seals.", 40.0, 890, 745, 490, 128, 2.0)]
+
+
 def timeline():
     vo = json.loads((OUT / "narration.json").read_text(encoding="utf-8"))
-    scenes = [  # (id, extra seconds after the narration, narration key, extra audio (file, offset after narration end, seconds))
+    scenes = [  # (id, extra seconds after the narration, narration key, extra audio (file, offset, seconds), flash on the cut)
         # sized to land just under 60 s, the length of the "Demo Day Drop" award
-        ("hook", 0.6, "hook", None), ("reveal", 0.6, "reveal", None), ("listen", 1.6, "listen", None),
-        ("agents", 1.0, "agents", None), ("warn", 4.6, "warn", (TE_WARN, 0.2, 4.3)),
-        ("hindi", 4.0, "hindi", (HI_WARN, 0.2, 3.7)), ("genuine", 2.0, "genuine", None), ("seal", 1.6, "seal", None),
-        ("ask", 2.0, "ask", None), ("sovereign", 1.0, "sovereign", None), ("end", 0.2, "end", None)]
-    t, out = 0.6, []
-    for sid, extra, key, extra_audio in scenes:
-        dur = 0.35 + vo[key] + extra
-        out.append({"id": sid, "start": round(t, 2), "dur": round(dur, 2), "vo": key, "vo_at": round(t + 0.35, 2),
-                    "extra": None if not extra_audio else {"file": str(extra_audio[0]), "at": round(t + 0.35 + vo[key] + extra_audio[1], 2),
+        ("hook", 0.4, "hook", None, False), ("reveal", 0.5, "reveal", None, True), ("listen", 1.2, "listen", None, False),
+        ("agents", 0.8, "agents", None, False), ("warn", 4.4, "warn", (TE_WARN, 0.2, 4.1), True),
+        ("hindi", 3.4, "hindi", (HI_WARN, 0.2, 3.2), False), ("genuine", 1.4, "genuine", None, False),
+        ("seal", 1.2, "seal", None, False), ("ask", 1.4, "ask", None, False),
+        ("montage", BEAT * len(MONTAGE), None, None, True), ("sovereign", 0.8, "sovereign", None, True),
+        ("end", 0.4, "end", None, True)]
+    t, out = BEAT, []
+    for sid, extra, key, extra_audio, flash in scenes:
+        lead = 0.35 if key else 0.0
+        speech = vo[key] if key else 0.0
+        out.append({"id": sid, "start": round(t, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
+                    "extra": None if not extra_audio else {"file": str(extra_audio[0]), "at": round(t + lead + speech + extra_audio[1], 3),
                                                            "len": extra_audio[2]}})
-        t += dur
+        spoken_end = t + lead + speech + (extra_audio[1] + extra_audio[2] if extra_audio else 0)
+        nxt = round((t + lead + speech + extra) / BEAT) * BEAT          # cut on the nearest beat ...
+        while nxt < spoken_end + 0.2:                                    # ... but never over speech
+            nxt += BEAT
+        out[-1]["dur"] = round(nxt - t, 3)
+        t = nxt
     return out, round(t + 0.8, 2)
 
 
@@ -85,25 +101,32 @@ def tick(d=0.08, f=2200):
     return np.sin(2 * np.pi * f * t) * np.exp(-t / 0.015) * 0.5
 
 
-def music(total, quiet_from, quiet_to):
-    # 96 BPM: A-minor pad (Am - F - C - G), a soft pulse and a kick from the reveal on
+def hat(d=0.04):
+    n = int(d * SR)
+    return np.diff(np.random.default_rng(4).standard_normal(n + 1)) * np.exp(-np.arange(n) / SR / 0.012) * 0.12
+
+
+def music(total, drop, gap, stop):
+    # 100 BPM, A minor (Am - F - C - G). Pad only until the reveal; the beat (kick, off-beat hats, sub bass) drops in on
+    # the reveal, the whole bed goes silent for the gap just before it, and the beat stops for the end card
     n = int(total * SR); t = np.arange(n) / SR
-    beat = 60 / 96
     chords = [(220.0, 261.6, 329.6), (174.6, 220.0, 261.6), (130.8, 164.8, 196.0), (196.0, 246.9, 293.7)]
-    pad = np.zeros(n, np.float32)
-    for i, start in enumerate(np.arange(0, total, beat * 4)):
-        a, b = int(start * SR), min(n, int((start + beat * 4.2) * SR))
+    pad, bass, beat = (np.zeros(n, np.float32) for _ in range(3))
+    bar = BEAT * 4
+    for i, start in enumerate(np.arange(0, total, bar)):
+        a, b = int(start * SR), min(n, int((start + bar * 1.05) * SR))
         seg = np.arange(b - a) / SR
-        tone = sum(np.sin(2 * np.pi * f * seg) + 0.35 * np.sin(2 * np.pi * 2 * f * seg) for f in chords[i % 4])
-        pad[a:b] += tone * np.minimum(1, seg / 0.8) * np.minimum(1, (beat * 4.2 - seg) / 0.6) * 0.06
-    kick = np.zeros(n, np.float32)
-    k = impact(0.35) * 0.7
-    for start in np.arange(quiet_from, total - 2, beat):
-        a = int(start * SR); kick[a:a + len(k)] += k[:max(0, min(len(k), n - a))]
-    pulse = (np.sin(2 * np.pi * 110 * t) * (np.sin(2 * np.pi * t / (beat / 2)) > 0.6)) * 0.03 * (t > quiet_from)
-    mix = lowpass(pad, 12) + kick * 0.5 + pulse
-    fade = np.minimum(1, t / 2.0) * np.minimum(1, (total - t) / 2.5)
-    return mix * fade
+        ch = chords[i % 4]
+        pad[a:b] += sum(np.sin(2 * np.pi * f * seg) + 0.35 * np.sin(2 * np.pi * 2 * f * seg) for f in ch) \
+            * np.minimum(1, seg / 0.6) * np.minimum(1, (bar * 1.05 - seg) / 0.4) * 0.06
+        bass[a:b] += np.sin(2 * np.pi * ch[0] / 4 * seg) * np.minimum(1, seg / 0.05) * np.minimum(1, (bar * 1.05 - seg) / 0.2) * 0.22
+    k, h = impact(0.32) * 0.6, hat()
+    for i, start in enumerate(np.arange(drop, stop, BEAT / 2)):
+        place(beat, k if i % 2 == 0 else h, start)
+    on = ((t >= drop) & (t < stop)).astype(np.float32)
+    mix = lowpass(pad, 12) + (bass + beat) * lowpass(on, 2400)
+    mix *= 1 - ((t >= gap) & (t < drop))                                   # the silence before the drop
+    return mix * np.minimum(1, t / 1.5) * np.minimum(1, (total - t) / 2.0)
 
 
 def place(track, clip, at, gain=1.0):
@@ -114,29 +137,32 @@ def place(track, clip, at, gain=1.0):
 
 
 def build_audio(scenes, total):
-    reveal = next(s for s in scenes if s["id"] == "reveal")
-    bed = music(total, reveal["start"], total)
+    at = {s["id"]: s["start"] for s in scenes}
+    bed = music(total, at["reveal"], at["reveal"] - 0.45, at["end"])
     voice, fx = np.zeros_like(bed), np.zeros_like(bed)
     for s in scenes:
-        place(voice, read_wav(OUT / f"vo_{s['vo']}.wav"), s["vo_at"], 1.0)
+        if s["vo"]:
+            place(voice, read_wav(OUT / f"vo_{s['vo']}.wav"), s["vo_at"], 1.0)
         if s["extra"]:
             clip = read_wav(Path(s["extra"]["file"]))[: int(s["extra"]["len"] * SR)]
             clip *= np.minimum(1, (s["extra"]["len"] - np.arange(len(clip)) / SR) / 0.4).clip(0, 1)
             place(voice, clip, s["extra"]["at"], 0.95)
-        if s["id"] not in ("hook",):
-            place(fx, whoosh(), max(0, s["start"] - 0.28), 0.55)
-    place(fx, riser(), reveal["start"] - 2.2, 0.6)
-    place(fx, impact(), reveal["start"] + 0.05, 1.0)
-    warn = next(s for s in scenes if s["id"] == "warn")
-    place(fx, impact(1.0), warn["start"] + 0.2, 0.5)
-    seal = next(s for s in scenes if s["id"] == "seal")
-    place(fx, tick(), seal["start"] + 1.7, 1.0)
-    place(fx, tick(f=900), seal["start"] + 2.5, 1.0)
+        if s["flash"]:
+            place(fx, impact(1.2), s["start"], 0.75)
+        elif s["id"] != "hook":
+            place(fx, whoosh(0.4), max(0, s["start"] - 0.2), 0.45)
+    place(fx, riser(2.0), at["reveal"] - 2.45, 0.6)                    # riser, then silence, then the drop
+    place(fx, impact(), at["reveal"], 0.6)
+    place(fx, riser(1.4), at["sovereign"] - 1.4, 0.5)
+    for i in range(1, len(MONTAGE)):
+        place(fx, impact(0.6), at["montage"] + i * BEAT, 0.55)
+    place(fx, tick(), at["seal"] + 1.7, 1.0)
+    place(fx, tick(f=900), at["seal"] + 2.5, 1.0)
     for i in range(3):
-        place(fx, tick(0.06, 1600), next(s for s in scenes if s["id"] == "sovereign")["start"] + 1.6 + i * 0.75, 0.7)
+        place(fx, tick(0.06, 1600), at["sovereign"] + 1.4 + i * BEAT, 0.7)
     # duck the music under speech
     speech = np.abs(voice) > 0.01
-    duck = 1 - 0.65 * lowpass(speech.astype(np.float32), int(0.3 * SR))
+    duck = 1 - 0.6 * lowpass(speech.astype(np.float32), int(0.3 * SR))
     mix = bed * duck * 0.9 + voice * 1.0 + fx * 0.8
     mix = np.tanh(mix * 1.1) * 0.92
     out = OUT / "trailer_audio.wav"
@@ -220,8 +246,18 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
 .stat .n{font-size:220px;font-weight:800;letter-spacing:-8px;line-height:1}
 .stat .t{font-size:44px;color:#9aa1ad;margin-top:10px;text-align:center}
 .end .name{font-size:150px}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
+.flash.go{animation:flash .32s ease-out}
+@keyframes flash{from{opacity:.85}to{opacity:0}}
+.mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
+.mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
 .hash-tags{font-size:28px;color:#6f7684;margin-top:40px;text-align:center;opacity:0}
-.on .hash-tags{animation:wordin .7s 1.4s forwards}
+.on .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
+.flash.go{animation:flash .32s ease-out}
+@keyframes flash{from{opacity:.85}to{opacity:0}}
+.mshot{position:absolute;inset:0;visibility:hidden}.mshot.on{visibility:visible}
+.mshot .label{font-size:84px;letter-spacing:-2px;top:40px}
+.hash-tags{animation:wordin .7s 1.4s forwards}
 </style></head><body>
 <div class="scene" id="hook"><div><div class="big"><span class="word">Every</span> <span class="word" style="animation-delay:.12s">day,</span>
  <span class="word" style="animation-delay:.24s">scammers</span> <span class="word" style="animation-delay:.36s">call</span><br>
@@ -253,6 +289,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
  <div class="chips"><div class="chip ok">✓ Original matches</div><div class="chip no">✗ 1 byte changed — fails</div></div></div></div>
 <div class="scene" id="ask"><div class="frame" style="--x:300;--y:85;--w:1000;--h:380;--s:1.6"><video id="v_ask" src="FOOTAGE" muted playsinline preload="auto"></video></div>
  <div class="label"><small>8 · Family assistant · Evon over the Kavach MCP server</small><span class="te">“అమ్మకి వచ్చిన చివరి call ఏంటి?”</span></div></div>
+<div class="scene" id="montage">MONTAGE</div>
 <div class="scene" id="sovereign"><div>
  <div class="kick">Sovereign AI for India</div>
  <div class="big" style="margin-top:18px">100% Gnani. <span class="amber">Trained in India.</span></div>
@@ -265,7 +302,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#07080b
  <div class="sub" style="font-size:52px;color:#f2f3f6">Keep the listener safe.</div>
  <div class="hash-tags">#GnaniAI · #GreatIndianAIInternshipChallenge</div></div></div>
 <script>
-const TL = TIMELINE, FOOT = {listen: 13.6, warn: 31.0, genuine: 79.0, ask: 90.5};
+const TL = TIMELINE, BEAT_MS = BEATMS, FOOT = Object.assign({listen: 13.6, warn: 31.0, genuine: 79.0, ask: 90.5}, MFOOT);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function scramble(el, target, ms) {
   const hex = "0123456789abcdef", t0 = performance.now();
@@ -292,13 +329,16 @@ window.run = async () => {
     const el = document.getElementById(s.id); el.classList.add("on");
     const v = document.getElementById("v_" + s.id);
     if (v) v.play();
+    if (s.flash) { const f = document.getElementById("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
+    if (s.id === "montage") document.querySelectorAll(".mshot").forEach((m, i) => setTimeout(() => {
+      document.querySelectorAll(".mshot").forEach(x => x.classList.remove("on")); m.classList.add("on"); }, i * BEAT_MS));
     if (s.id === "agents") document.querySelectorAll("#pipe .node").forEach((n, i) => setTimeout(() => n.classList.add("lit"), 250 + i * 300));
     if (s.id === "seal") scramble(document.getElementById("hash"), "HASH", 800);
   }
   await sleep((TOTAL - TL[TL.length - 1].start) * 1000);
   return (performance.now() - t0) / 1000;
 };
-</script></body></html>"""
+</script><div class="flash" id="flash"></div></body></html>"""
 
 
 def main():
@@ -307,7 +347,13 @@ def main():
     print(f"{len(scenes)} scenes, {total} s")
     audio = build_audio(scenes, total)
     footage = (DEMO / "kavach_demo.mp4").as_uri()
+    montage = "".join(
+        f'<div class="mshot"><div class="frame" style="--x:{x};--y:{y};--w:{w};--h:{h};--s:{sc}">'
+        f'<video id="v_m{i}" src="FOOTAGE" muted playsinline preload="auto"></video></div><div class="label">{word}</div></div>'
+        for i, (word, _, x, y, w, h, sc) in enumerate(MONTAGE))
     html = (PAGE.replace("TIMELINE", json.dumps(scenes)).replace("TOTAL", str(total))
+            .replace("MONTAGE", montage).replace("BEATMS", str(round(BEAT * 1000)))
+            .replace("MFOOT", json.dumps({f"m{i}": m[1] for i, m in enumerate(MONTAGE)}))
             .replace("FOOTAGE", footage).replace('"HASH"', json.dumps(SEAL_HASH)))
     page_file = OUT / "stage.html"
     page_file.write_text(html, encoding="utf-8")
