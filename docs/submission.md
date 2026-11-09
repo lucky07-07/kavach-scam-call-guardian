@@ -36,7 +36,7 @@ understands, and afterwards the family has no trustworthy record to give the pol
 1. **Listener (Gnani Prisma v2.5)** transcribes the call and separates caller from listener, in Telugu, English or Hinglish.
 2. **Prosecutor and 3. Defender (Gnani Evon v3.3)** argue both sides, quoting the caller's exact words.
 4. **Judge (code, never the LLM):** a scam tactic counts only if the caller's own words in the transcript prove it, and it isn't negated ("we will never ask for your OTP"). Rule-based red lines catch tricks the LLM misses, such as entering a PIN to "receive" money, or remote-access apps.
-5. **Guardian (Evon + Gnani Timbre):** speaks a short warning in the listener's language, Telugu or Hindi. Code checks Evon's text first: mostly Telugu, never repeating the caller, no numbers or links. Otherwise an approved warning is used.
+5. **Guardian (Evon + Gnani Timbre):** speaks a short warning in the listener's language, Telugu or Hindi. Code checks Evon's text first: mostly Telugu, never repeating the caller, no numbers or links. Otherwise an approved warning is used. **At the same moment it alerts the family**: a message in Telugu or Hindi built in code from the verdict and the verified tactics ("Amma just got a scam call; the caller asked for her OTP… call her now"), voiced by Timbre as a voice note and queued for delivery. Genuine calls send nothing.
 6. **Reporter (Evon):** drafts the 1930 / cybercrime.gov.in complaint.
 7. **Notary:** seals the evidence packet (audio hash, transcript, evidence, verdict, warning, rules version) with SHA-256, a hash chain and OpenTimestamps on Bitcoin. Only 32 bytes leave the device, and a one-byte edit fails verification.
 8. **Family assistant (Evon over a Kavach MCP server):** after the call the family asks in Telugu ("what was amma's last call?"). Evon answers from read-only MCP tools (list_incidents, get_incident, verify_seal, draft_complaint), so it can explain and verify but never change a verdict.
@@ -64,6 +64,7 @@ understands, and afterwards the family has no trustworthy record to give the pol
 - **Code-checked LLM output.** Letting the LLM choose tools freely mixed up calls, so the family assistant's lookups are planned in code and Evon writes the answer.
 
 **Limits and next steps.**
+- **Family alert delivery:** the alert is built, voiced and queued; connecting an SMS/WhatsApp gateway is next.
 - **Live listening:** today Kavach analyses a recorded call. Next is live streaming with a guardian device.
 - **Caller-ID checker (agent 9):** compare the caller's claimed identity with the number's 160-series and displayed name.
 - **Real calls:** a blind test on real calls acted by volunteers.
@@ -85,6 +86,7 @@ understands, and afterwards the family has no trustworthy record to give the pol
 > ⚖️ **Evon** argues both sides like a courtroom: one agent says scam, one says genuine, each quoting the caller
 > 🧑‍⚖️ The **verdict is decided by code**: a tactic counts only if the caller's own words prove it, so genuine bank calls stay silent
 > 🔊 **Timbre** warns the listener in Telugu: "జాగ్రత్త, ఇది మోసం కాల్…"
+> 📲 And it **alerts the family** at once, with a Telugu voice note: "Amma just got a scam call. Call her now."
 > 📝 It drafts the 1930 complaint and **seals the evidence on Bitcoin**, so nobody can edit it later
 > 💬 After the call, the family asks Kavach in Telugu over MCP tools: "what was amma's last call?"
 >

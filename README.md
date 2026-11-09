@@ -1,7 +1,7 @@
 # Kavach — a second listener for scam calls
 
 Kavach listens to a phone call with an elderly Telugu speaker. If the caller tries a scam, it warns the listener in Telugu,
-drafts the 1930 / cybercrime complaint, and seals the evidence on Bitcoin so nobody can edit it later. After the call, the
+alerts the family at once, drafts the 1930 / cybercrime complaint, and seals the evidence on Bitcoin so nobody can edit it later. After the call, the
 family can ask Kavach what happened, in Telugu.
 
 Built for the **Gnani AI Great Indian AI Internship Challenge 2026**, entirely on Gnani models:
@@ -26,7 +26,10 @@ call audio
                  and is not negated ("we will never ask for OTP"); red-line rules in code catch what Evon misses
                  → SCAM (verified request or threat) / SUSPICIOUS / SAFE
   5 Guardian     Evon writes the Telugu warning; code checks it (mostly Telugu, no caller words, no numbers or links)
-                 or uses an approved warning; Timbre speaks it
+                 or uses an approved warning; Timbre speaks it.
+                 Family alert: on SCAM or SUSPICIOUS, code builds a message for the family in Telugu or Hindi from the
+                 verdict and verified tactics only ("Amma just got a scam call… call her now"), Timbre voices it as a
+                 voice note, and it is queued for delivery
   6 Reporter     Evon fills the complaint fields; code assembles the 1930 complaint
   7 Notary       evidence packet → SHA-256 → hash chain → OpenTimestamps (Bitcoin); only 32 bytes leave the device
 after the call
@@ -59,6 +62,7 @@ Known limits:
 - **Punctuation:** restoring it on Telugu mostly fails (Evon rewrites words, so the code keeps Prisma's text). Verdicts were still right.
 - **Telugu answers:** the family assistant sometimes answers Telugu questions in mixed English. A fixed Telugu answer built from the same facts is used then, and is labelled as such.
 - **Hindi:** Hindi calls are transcribed with Prisma `en-IN`, which writes Hinglish in Latin script, the form the rules read; `hi-IN` writes everything in Devanagari, which the rules do not yet read.
+- **Family alert delivery:** alerts are queued in `data/alerts/outbox.jsonl` and shown on the screen; no SMS/WhatsApp gateway is connected yet.
 - **Not live yet:** calls are analysed after recording. Prisma's batch mode is what separates the speakers.
 - **Missed tactics:** Evon still misses some, such as the password request. Red-line rules cover OTP/PIN-to-receive and remote-access apps.
 
@@ -89,13 +93,15 @@ kavach/
   evon.py            Evon client and prompts (Prosecutor, Defender, explainer, Reporter, punctuation)
   rules.py           Agent 4 — the Judge: quote checks, cues, negation, red lines, verdict
   guardian.py        Agent 5 — Telugu warning text checks + Timbre voice
+  family_alert.py    Agent 5 — the family alert (code-built Telugu/Hindi message, Timbre voice note, outbox)
   rl_warn.py         experiment: RL "when to warn" policy on ICFD-31k (ties the Judge; not in the pipeline)
   notary.py          Agent 7 — evidence packet, hash chain, OpenTimestamps, verification
   pipeline.py        Agents 1–7 in order
   mcp_server.py      Kavach MCP server (read-only tools)
   assistant.py       Agent 8 — family assistant over MCP
   web.py, web/       the demo screen (FastAPI + one page)
-  trailer/           launch trailer: Timbre narration, animated stage, synthesised SFX and music
+  trailer/           60-second trailer: Timbre narration, a recorded walkthrough of the real screen (cursor, clicks),
+                     beat-cut stage, synthesised SFX and music
   timbre.py, transcript.py, gnani_key.py, schemas/
   test_*.py, check_*.py, make_*.py   tests, measurements, test-audio and demo-video makers
 evon/                Kaggle notebook that hosts Evon (llama-server + Cloudflare tunnel), prompt iteration notes
