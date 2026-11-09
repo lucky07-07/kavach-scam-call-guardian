@@ -77,29 +77,31 @@ understands, and afterwards the family has no trustworthy record to give the pol
 
 ---
 
-## LinkedIn post (attach the demo video)
+## LinkedIn post (attach the trailer, data/demo/trailer/kavach_trailer.mp4)
 
-> **My grandmother can't spot a scam call in English. So we built one that speaks Telugu.**
+> **My grandmother can't spot a scam call in English. So I built a second listener that speaks Telugu.**
 >
-> "Your KYC has expired — tell me the OTP." Scams like this target elderly people who answer alone, in their own language.
+> Indians lost ₹22,845 crore to cyber fraud in 2024, about ₹62 crore a day. Most of it starts with one phone call: "Your KYC has expired. Tell me the OTP."
 >
-> For the #GreatIndianAIInternshipChallenge we built **Kavach**, a second listener on the call, built entirely on @Gnani AI models:
-> 🎧 **Prisma** hears the call and separates caller from listener, in Telugu and English
+> For the #GreatIndianAIInternshipChallenge I built **Kavach**, a second listener on the call, built entirely on Gnani AI models:
+> 🎧 **Prisma** hears the call and separates caller from listener, in Telugu, Hindi and English
 > ⚖️ **Evon** argues both sides like a courtroom: one agent says scam, one says genuine, each quoting the caller
 > 🧑‍⚖️ The **verdict is decided by code**: a tactic counts only if the caller's own words prove it, so genuine bank calls stay silent
 > 🔊 **Timbre** warns the listener in Telugu: "జాగ్రత్త, ఇది మోసం కాల్…"
-> 📲 And it **alerts the family** at once, with a Telugu voice note: "Amma just got a scam call. Call her now."
+> 📲 It **alerts the family** at once, with a voice note: "Amma just got a scam call. Call her now."
 > 📝 It drafts the 1930 complaint and **seals the evidence on Bitcoin**, so nobody can edit it later
-> 💬 After the call, the family asks Kavach in Telugu over MCP tools: "what was amma's last call?"
+> 💬 After the call, the family asks Kavach what happened, in Telugu
 >
 > Eight agents, one job: keep the listener safe.
 >
-> What surprised us: Telugu speech recognition writes "OTP" as "ఓటీపీ", and one dropped word can turn "we will **not** ask for your PIN" into a scam. Real audio teaches you things text never does.
+> What surprised me: Telugu speech recognition writes "OTP" as "ఓటీపీ", and one dropped word can turn "we will **not** ask for your PIN" into a scam. Real audio teaches you things text never does.
 >
-> Demo below 👇 Would you want this on your parents' phone?
+> Try it (the real screen, replaying saved calls): https://kavach-scam-call-guardian.vercel.app
+>
+> Would you want this on your parents' phone?
 >
 > #GnaniAI #GreatIndianAIInternshipChallenge #VoiceAI #Telugu #ScamAwareness #AIforGood
 
 ## X / Twitter (short)
 
-> Built **Kavach** for #GreatIndianAIInternshipChallenge: a second listener that catches scam calls and warns elderly listeners **in Telugu**. Gnani Prisma hears, Evon argues both sides, code decides, Timbre warns, evidence sealed on Bitcoin. Demo 👇 #GnaniAI
+> I built **Kavach** for #GreatIndianAIInternshipChallenge: a second listener that catches scam calls and warns elderly listeners **in Telugu**. Gnani Prisma hears, Evon argues both sides, code decides, Timbre warns, evidence sealed on Bitcoin. https://kavach-scam-call-guardian.vercel.app #GnaniAI
