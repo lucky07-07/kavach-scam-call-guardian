@@ -1,6 +1,6 @@
 # Kavach — a second listener for scam calls
 
-**Solution pitch (1 page):** [PITCH.md](PITCH.md) · [PDF](docs/Kavach_pitch.pdf) &nbsp;|&nbsp; **Demo video (2:50):** [kavach_demo_full.mp4](data/demo/kavach_demo_full.mp4) &nbsp;|&nbsp; **Trailer (0:60):** [kavach_trailer.mp4](data/demo/trailer/kavach_trailer.mp4)
+**Solution pitch (1 page):** [PITCH.md](PITCH.md) · [PDF](docs/Kavach_pitch.pdf) &nbsp;|&nbsp; **Demo video (2:21):** [kavach_demo_full.mp4](data/demo/kavach_demo_full.mp4) &nbsp;|&nbsp; **Trailer (0:60):** [kavach_trailer.mp4](data/demo/trailer/kavach_trailer.mp4)
 
 Kavach listens to a phone call with an elderly Telugu speaker. If the caller tries a scam, it warns the listener in Telugu,
 alerts the family at once, drafts the 1930 / cybercrime complaint, and seals the evidence on Bitcoin so nobody can edit it later. After the call, the

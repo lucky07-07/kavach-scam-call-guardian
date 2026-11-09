@@ -21,17 +21,17 @@ LINES = {   # 60-second cut for the "Demo Day Drop" award (best 60-second demo v
 }
 
 
-def main():
+def main(lines=LINES, out=OUT):
     sys.stdout.reconfigure(encoding="utf-8")
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     tts, durations = Timbre(), {}
-    for key, line in LINES.items():
+    for key, line in lines.items():
         pcm = tts.speak(line, VOICE, MODEL, "en-IN", RATE, 1.0)
-        (OUT / f"vo_{key}.wav").write_bytes(wav_of(pcm, RATE))
+        (out / f"vo_{key}.wav").write_bytes(wav_of(pcm, RATE))
         durations[key] = round(len(pcm) / 2 / RATE, 2)
         print(f"{key:8s} {durations[key]:5.2f} s  {line}")
-    (OUT / "narration.json").write_text(json.dumps(durations, indent=2), encoding="utf-8")
-    print("total", round(sum(durations.values()), 1), "s,", sum(len(l) for l in LINES.values()), "chars")
+    (out / "narration.json").write_text(json.dumps(durations, indent=2), encoding="utf-8")
+    print("total", round(sum(durations.values()), 1), "s,", sum(len(l) for l in lines.values()), "chars")
 
 
 if __name__ == "__main__":

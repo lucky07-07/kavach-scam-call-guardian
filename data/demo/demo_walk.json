@@ -1,0 +1,20 @@
+{
+  "take_run": 8.07,
+  "call_go": 13.17,
+  "verdict": 33.57,
+  "take_why": 35.4,
+  "why_end": 45.27,
+  "take_warn": 45.63,
+  "warn_click": 47.67,
+  "take_family": 54.27,
+  "family_click": 56.33,
+  "take_report": 64.13,
+  "take_seal": 69.33,
+  "seal_ok": 71.53,
+  "seal_bad": 72.97,
+  "take_genuine": 83.47,
+  "genuine_go": 84.43,
+  "genuine_safe": 109.07,
+  "take_ask": 137.2,
+  "ask_end": 145.57
+}

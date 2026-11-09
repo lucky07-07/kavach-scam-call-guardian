@@ -29,7 +29,7 @@ addEventListener('DOMContentLoaded', () => {
   c.innerHTML = '<svg width="26" height="30" viewBox="0 0 17 22"><path d="M1 1v17l4.5-4.5 3.2 7 3-1.4-3.1-6.6h6.4z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   document.documentElement.appendChild(c);
   const k = document.createElement('div'); k.id = 'sync';
-  k.style.cssText = 'position:fixed;right:0;bottom:0;width:10px;height:10px;z-index:99999;background:#f0f';
+  k.style.cssText = 'position:fixed;right:0;bottom:0;width:10px;height:10px;z-index:99999;background:' + (window.name.startsWith('#') ? window.name : '#f0f');
   document.documentElement.appendChild(k);
   addEventListener('mousemove', e => c.style.transform = `translate(${e.clientX - 2}px,${e.clientY - 2}px)`, true);
   addEventListener('mousedown', e => {

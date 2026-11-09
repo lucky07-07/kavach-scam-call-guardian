@@ -53,18 +53,40 @@ def marks():
     return json.loads((DEMO / "walkthrough.json").read_text(encoding="utf-8"))
 
 
+def hook(vo):
+    # the opening shared by the trailer and the full demo: the scam call, cut on the OTP, then what it costs
+    call_end = pause_before(CALL, CALL_FROM + 3.8, CALL_FROM)
+    reply = VOICE_AT + (call_end - CALL_FROM) + 0.3        # when she starts reading the OTP out
+    scenes = [("call", reply + 2.95, None, [(CALL, VOICE_AT, CALL_FROM, call_end)], False, None),
+              ("stakes", vo["stakes"] + 1.7, "stakes", [], True, None),
+              ("reveal", 0, "reveal", [], True, None)]
+    timing = dict(sms=SMS_AT, voice=round(call_end - CALL_FROM, 3), reply=round(reply, 3),
+                  cut=round(reply + DIGITS[-1] + 0.4, 3), punch=round(reply + DIGITS[-1] + 1.0, 3))   # silence, then the punch
+    return scenes, timing
+
+
+def lay_out(scenes, vo):
+    # (id, at least seconds, narration, extra audio [(file, at, from, to)], flash on the cut, walkthrough take start)
+    # -> timed scenes, each a whole number of beats long
+    t, out = 0.0, []
+    for sid, least, key, extras, flash, take in scenes:
+        lead = 0.25 if key else 0.0
+        need = max(least, lead + (vo[key] if key else 0) + 0.2, *[at + (b - a) + 0.2 for _, at, a, b in extras])
+        dur = math.ceil(need / BEAT - 1e-6) * BEAT
+        out.append({"id": sid, "start": round(t, 3), "dur": round(dur, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
+                    "take": take, "extras": [{"file": str(f), "at": round(t + at, 3), "from": a, "to": b} for f, at, a, b in extras]})
+        t += dur
+    return out, round(t + 0.3, 2)
+
+
 def timeline():
     vo = json.loads((OUT / "narration.json").read_text(encoding="utf-8"))
     m = marks()
     warn_take = m["warn_click"] - 0.5                     # the warn scene starts half a second before the play click
     te_end, fam_end, hi_end = pause_before(TE_WARN, 3.0), pause_before(FAMILY, 3.6), pause_before(HI_WARN, 3.2)
-    call_end = pause_before(CALL, CALL_FROM + 3.8, CALL_FROM)
-    reply = VOICE_AT + (call_end - CALL_FROM) + 0.3        # when she starts reading the OTP out
     fam_at = 0.25 + vo["family"] + 0.05                   # the voice note plays right after the narration line
-    scenes = [  # (id, at least seconds, narration, extra audio [(file, at, from, to)], flash on the cut, walkthrough take start)
-        ("call", reply + 2.95, None, [(CALL, VOICE_AT, CALL_FROM, call_end)], False, None),
-        ("stakes", vo["stakes"] + 1.7, "stakes", [], True, None),
-        ("reveal", 0, "reveal", [], True, None),
+    opening, timing = hook(vo)
+    scenes = opening + [
         ("pipeline", 5.4, "agents", [], False, m["take_listen"]),
         ("listen", 4.8, "listen", [], False, m["take_listen"]),
         ("warn", 0, None, [(TE_WARN, 0.5, 0, te_end)], True, warn_take),
@@ -75,18 +97,10 @@ def timeline():
         ("seal", 3.6, "seal", [], False, m["take_seal"]),
         ("sovereign", 4.2, "sovereign", [], True, None),
         ("end", 0, "end", [], True, None)]
-    t, out = 0.0, []
-    for sid, least, key, extras, flash, take in scenes:
-        lead = 0.25 if key else 0.0
-        need = max(least, lead + (vo[key] if key else 0) + 0.2, *[at + (b - a) + 0.2 for _, at, a, b in extras])
-        dur = math.ceil(need / BEAT - 1e-6) * BEAT
-        out.append({"id": sid, "start": round(t, 3), "dur": round(dur, 3), "vo": key, "vo_at": round(t + lead, 3), "flash": flash,
-                    "take": take, "extras": [{"file": str(f), "at": round(t + at, 3), "from": a, "to": b} for f, at, a, b in extras]})
-        t += dur
-    out[0].update(sms=SMS_AT, voice=round(call_end - CALL_FROM, 3), reply=round(reply, 3),
-                  cut=round(reply + DIGITS[-1] + 0.4, 3), punch=round(reply + DIGITS[-1] + 1.0, 3))   # silence, then the punch
+    out, total = lay_out(scenes, vo)
+    out[0].update(timing)
     out[next(i for i, s in enumerate(out) if s["id"] == "family")]["note_at"] = fam_at
-    return out, round(t + 0.3, 2)
+    return out, total
 
 
 # ---------------------------------------------------------------- audio: music bed and SFX, synthesised
@@ -209,16 +223,21 @@ def retime(video, scenes, total):
         f"concat=n={len(pts) - 1}:v=1:a=0,fps=30,drawbox=x=1906:y=1066:w=14:h=14:color=0x07080b:t=fill[v]"
 
 
-def build_audio(scenes, total):
+def build_audio(scenes, total, clicks=None, vo_dir=OUT, out=OUT / "trailer_audio.wav", bed_after=None):
     at = {s["id"]: s["start"] for s in scenes}
-    m = marks()
+    if clicks is None:                                                 # the two verify clicks in the seal scene
+        m = marks()
+        clicks = [at["seal"] + m[k] - m["take_seal"] for k in ("seal_ok", "seal_bad")]
     punch = scenes[0]["punch"]
     bed = music(total, at["reveal"], at["reveal"] - 0.45, at["end"])
+    if bed_after:                                                      # (scene, gain): softer music under a long walkthrough
+        t = np.arange(len(bed)) / SR
+        bed *= np.where((t >= at[bed_after[0]] + 0.5) & (t < at["sovereign"] - 1.5), bed_after[1], 1.0)
     bed *= np.minimum(1, np.maximum(0, np.arange(len(bed)) / SR - punch) / 0.4)   # no music under the call: voice, heartbeat, ticks
     voice, fx = np.zeros_like(bed), np.zeros_like(bed)
     for s in scenes:
         if s["vo"]:
-            place(voice, read_wav(OUT / f"vo_{s['vo']}.wav"), s["vo_at"], 1.0)
+            place(voice, read_wav(vo_dir / f"vo_{s['vo']}.wav"), s["vo_at"], 1.0)
         for e in s["extras"]:
             clip = read_wav(Path(e["file"]))[int(e["from"] * SR): int(e["to"] * SR)]
             clip *= np.minimum(1, (len(clip) - np.arange(len(clip))) / (0.12 * SR)).clip(0, 1)   # end on the pause, softly
@@ -244,15 +263,14 @@ def build_audio(scenes, total):
     place(fx, riser(1.4), at["sovereign"] - 1.4, 0.5)
     for i in range(8):                                                 # the pipeline lights up, agent by agent
         place(fx, tick(0.05, 1400 + 90 * i), at["pipeline"] + 0.3 + i * 0.42, 0.45)
-    for k in ("seal_ok", "seal_bad"):                                  # the two verify clicks
-        place(fx, tick(), at["seal"] + m[k] - m["take_seal"], 0.9)
+    for c in clicks:
+        place(fx, tick(), c, 0.9)
     for i in range(3):
         place(fx, tick(0.06, 1600), at["sovereign"] + 1.4 + i * BEAT, 0.7)
     speech = np.abs(voice) > 0.01                                      # duck the music under speech
     duck = 1 - 0.6 * lowpass(speech.astype(np.float32), int(0.3 * SR))
     mix = bed * duck * 0.9 + voice * 1.0 + fx * 0.8
     mix = np.tanh(mix * 1.1) * 0.92
-    out = OUT / "trailer_audio.wav"
     with wave.open(str(out), "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes((mix * 32767).astype(np.int16).tobytes())
@@ -539,22 +557,24 @@ def family_alert():
     return F.build(r["verdict"], r["tactics"], r.get("evidence", []), "te", (r.get("seal") or {}).get("index"))
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
-    scenes, total = timeline()
-    print(f"{len(scenes)} scenes, {total} s:", ", ".join(f"{s['id']} {s['dur']}" for s in scenes))
-    if total > 60:
-        sys.exit("over 60 s: shorten a scene")
-    audio = build_audio(scenes, total)
-    small = OUT / "walk_1600.mp4"          # the window is 1600x900, so decode no more than that
-    if not small.exists() or small.stat().st_mtime < WALK.stat().st_mtime:
-        subprocess.run([str(FFMPEG), "-y", "-v", "error", "-i", str(WALK), "-vf", "scale=1600:900", "-c:v", "libx264", "-crf", "18",
-                        "-preset", "fast", "-an", str(small)], check=True)
-    walk = small.as_uri()
+def small(video, name):
+    # the window is 1600x900, so decode no more than that
+    out = OUT / name
+    if not out.exists() or out.stat().st_mtime < video.stat().st_mtime:
+        subprocess.run([str(FFMPEG), "-y", "-v", "error", "-i", str(video), "-vf", "scale=1600:900", "-c:v", "libx264", "-crf", "18",
+                        "-preset", "fast", "-an", str(out)], check=True)
+    return out.as_uri()
+
+
+def build_page(scenes, total, live, walk):
+    # live: scene -> (kicker, headline, camera focus[, video]); scenes without a slot in PAGE go in before the sovereign card
     html = PAGE
-    for sid, (kicker, head, focus) in LIVE.items():
-        html = html.replace(f"LIVE_{sid}", f'<div class="scene" id="{sid}"><div class="win cam" style="--fo:{focus}"><video id="v_{sid}" '
-                            f'src="{walk}" muted playsinline preload="auto"></video></div><div class="label"><small>{kicker}</small>{head}</div></div>')
+    for sid, (kicker, head, focus, *src) in live.items():
+        div = (f'<div class="scene" id="{sid}"><div class="win cam" style="--fo:{focus}"><video id="v_{sid}" src="{src[0] if src else walk}" '
+               f'muted playsinline preload="auto"></video></div><div class="label"><small>{kicker}</small>{head}</div></div>')
+        html = html.replace(f"LIVE_{sid}", div) if f"LIVE_{sid}" in html else \
+            html.replace('<div class="scene" id="sovereign">', div + '\n<div class="scene" id="sovereign">')
+    html = re.sub(r"\nLIVE_\w+", "", html)
     cards = "".join(f'<div class="pc {cls}"><em>{i + 1}</em><b>{name}</b><span>{by}</span><p>{what}</p></div>'
                     for i, (name, by, what, cls) in enumerate(AGENTS))
     bars = "".join(f'<b style="--b:{(i * 0.137) % 0.42:.2f}s"></b>' for i in range(28))
@@ -566,9 +586,14 @@ def main():
             .replace("SUBTEXT", json.dumps(SUBTITLE)).replace("DIGITLIST", json.dumps(DIGITS)).replace("DAYAT", str(STAKES_DAY))
             .replace("PER_DAY", str(PER_DAY))
             .replace("FAMTEXT", alert["text"]).replace("FAMENGLISH", alert["english"]).replace("WAVE", wavebars).replace("LOSS", LOSS.replace(",", "")).replace("WALK", walk))
-    page_file = OUT / "stage.html"
+    return html
+
+
+def render(html, scenes, total, audio, out, name="stage"):
+    # play the stage in headless Chrome, put each scene back on its planned start, lay the audio under it
+    page_file = OUT / f"{name}.html"
     page_file.write_text(html, encoding="utf-8")
-    rec = OUT / "rec"
+    rec = OUT / f"rec_{name}"
     shutil.rmtree(rec, ignore_errors=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True, args=["--autoplay-policy=no-user-gesture-required"])
@@ -582,7 +607,6 @@ def main():
         ctx.close(); browser.close()
     video = next(rec.glob("*.webm"))
     print(f"stage ran {took:.1f} s")
-    out = OUT / "kavach_trailer.mp4"
     cmd = [str(FFMPEG), "-y", "-i", str(video), "-i", str(audio), "-filter_complex", retime(video, scenes, total), "-map", "[v]", "-map", "1:a",
            "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
            "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",   # social-media loudness
@@ -591,6 +615,16 @@ def main():
     if r.returncode:
         sys.exit(r.stderr[-2000:])
     print("wrote", out)
+
+
+def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    scenes, total = timeline()
+    print(f"{len(scenes)} scenes, {total} s:", ", ".join(f"{s['id']} {s['dur']}" for s in scenes))
+    if total > 60:
+        sys.exit("over 60 s: shorten a scene")
+    audio = build_audio(scenes, total)
+    render(build_page(scenes, total, LIVE, small(WALK, "walk_1600.mp4")), scenes, total, audio, OUT / "kavach_trailer.mp4")
 
 
 if __name__ == "__main__":

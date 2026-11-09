@@ -318,6 +318,7 @@ window.kavachDemo = async (callId, opts = {}) => {
   reset(); flow(Object.fromEntries(STEPS.map(([id]) => [id, "work"])));
   const r = await (await fetch("/api/analyse", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({call_id: callId, mode: "replay"})})).json();
   demo = {t0: performance.now(), gloss: opts.gloss || []};
+  if (opts.onStart) opts.onStart();   // the recorder marks the moment the call audio starts
   await reveal(r);
   const warnAt = (performance.now() - demo.t0) / 1000;
   if (r.warning.text && opts.warningGloss) caption(opts.warningGloss, "Kavach to the listener, in Telugu");

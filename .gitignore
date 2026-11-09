@@ -28,3 +28,8 @@ multi_agent_ideation/
 ui-mockups/
 docs/Gnani_Challenge_Research_Dossier.*
 evon/kaggle_push*/
+data/demo/rec_demo/
+data/demo/trailer/rec_*/
+data/demo/trailer/*stage.html
+data/demo/trailer/*_1600.mp4
+data/demo/trailer/full/*.wav
